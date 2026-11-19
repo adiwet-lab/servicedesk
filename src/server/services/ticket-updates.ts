@@ -126,7 +126,7 @@ export async function updateTicketFields(actor: Actor, ticketId: string, raw: un
   const sla = slaRelevant
     ? await computeSlaTargets(prisma, {
         subcategorySlaProfileId: subcategory?.slaProfileId, categorySlaProfileId: category.slaProfileId,
-        teamId: ticket.ownerTeamId, priorityId: priority.id, start: ticket.createdAt,
+        teamId: ticket.ownerTeamId, priorityId: priority.id, start: ticket.createdAt, pausedBusinessMinutes: ticket.slaPausedMinutes,
       })
     : null;
 
@@ -138,7 +138,7 @@ export async function updateTicketFields(actor: Actor, ticketId: string, raw: un
         priorityId: priority.id, branchId: input.branchId, locationId: input.locationId, contactNumber: input.contactNumber,
         relatedAsset: input.relatedAsset, affectedSystem: input.affectedSystem, affectedUsers: input.affectedUsers,
         isConfidential: input.isConfidential,
-        ...(sla ? { slaProfileId: sla.slaProfileId, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt } : {}),
+        ...(sla ?? {}), // re-snapshot targets; pause ledger preserved
       },
     });
     for (const c of changes) {
@@ -241,7 +241,7 @@ export async function escalateTicket(actor: Actor, ticketId: string, raw: unknow
   const oldPriority = await prisma.priority.findUniqueOrThrow({ where: { id: ticket.priorityId } });
   if (newPriority && newPriority.level > oldPriority.level) throw new ValidationError("Escalation can only raise the priority.");
   const sla = newPriority
-    ? await computeSlaTargets(prisma, { categorySlaProfileId: ticket.slaProfileId, teamId, priorityId: newPriority.id, start: ticket.createdAt })
+    ? await computeSlaTargets(prisma, { categorySlaProfileId: ticket.slaProfileId, teamId, priorityId: newPriority.id, start: ticket.createdAt, pausedBusinessMinutes: ticket.slaPausedMinutes })
     : null;
 
   await transaction(async (tx) => {
@@ -250,7 +250,7 @@ export async function escalateTicket(actor: Actor, ticketId: string, raw: unknow
       data: {
         ...(teamChanged ? { ownerTeamId: teamId, assignedAgentId: null } : {}),
         ...(newPriority ? { priorityId: newPriority.id } : {}),
-        ...(sla?.resolutionDueAt ? { responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt } : {}),
+        ...(sla?.resolutionTargetMin != null ? sla : {}),
       },
     });
     await tx.ticketAssignment.create({

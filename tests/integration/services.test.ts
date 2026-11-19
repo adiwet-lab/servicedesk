@@ -157,7 +157,9 @@ describe("workflow & assignment", () => {
     await changeTicketStatus(agent, { ticketId: printerTicket.id, toStatusId: await status("RESOLVED"), resolutionSummary: "Replaced roller" });
     t = await prisma.ticket.findUniqueOrThrow({ where: { id: printerTicket.id } });
     expect(t.resolvedAt).not.toBeNull();
-    expect(t.slaPausedAt).toBeNull();
+    // Resolution stops the SLA clock (kept stopped so a reopen continues it) and records the outcome.
+    expect(t.slaPausedAt).not.toBeNull();
+    expect(await prisma.slaEvent.count({ where: { ticketId: printerTicket.id, clock: "RESOLUTION", type: { in: ["MET", "BREACHED"] } } })).toBe(1);
   });
   it("requester can close, after which the ticket is locked for the agent", async () => {
     await changeTicketStatus(await actor("emma"), { ticketId: printerTicket.id, toStatusId: await status("CLOSED") });

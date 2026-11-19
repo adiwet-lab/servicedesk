@@ -19,7 +19,8 @@
     "test:e2e": "playwright test --trace off",
     "format": "prettier --write .",
     "dev:next": "next dev",
-    "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=dist/server.js"
+    "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=dist/server.js",
+    "jobs:run": "tsx scripts/run-jobs.ts"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.34.0",

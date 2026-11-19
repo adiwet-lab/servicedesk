@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 
 const FEATURES: Record<string, [string, string, string]> = {
-  "escalation-rules": ["Escalation Rules", "Phase 4", "Configure SLA warning/breach escalations (seeded rules are visible under SLA)."],
 };
 
 export default async function SoonPage({ params }: { params: Promise<{ slug: string }> }) {

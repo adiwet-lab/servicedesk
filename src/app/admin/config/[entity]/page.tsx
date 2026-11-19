@@ -4,7 +4,7 @@ import { CrudPage } from "@/components/admin/crud-page";
 import { AuthorizationError } from "@/server/authz/errors";
 import type { EntityKey } from "@/server/services/admin/crud";
 
-const MAP: Record<string, EntityKey> = { categories: "categories", routing: "routing", priorities: "priorities", statuses: "statuses", holidays: "holidays" };
+const MAP: Record<string, EntityKey> = { categories: "categories", routing: "routing", priorities: "priorities", statuses: "statuses", holidays: "holidays", escalations: "escalations" };
 
 export default async function ConfigEntityPage({ params }: { params: Promise<{ entity: string }> }) {
   const actor = await requireAdminPortal();

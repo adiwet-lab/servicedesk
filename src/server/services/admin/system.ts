@@ -91,12 +91,120 @@ export async function listAuditLogs(actor: Actor, q: { q?: string; action?: stri
   return { total, rows, page, pages: Math.max(1, Math.ceil(total / take)), actions: actions.map((a) => a.action), entities: entities.map((e) => e.entityType) };
 }
 
-// ───────────────────────────── SLA (read-only in Phase 1) ─────────────────────────────
 
-export async function getSlaOverview(actor: Actor) {
+// ───────────────────────────── SLA targets ─────────────────────────────
+
+export async function getSlaProfileDetail(actor: Actor, id: string) {
   requirePermission(actor, P.ADMIN_SLA);
-  return prisma.slaProfile.findMany({
-    include: { businessHours: { include: { holidays: true } }, targets: { include: { priority: true }, orderBy: { priority: { level: "asc" } } }, escalations: true },
-    orderBy: { name: "asc" },
+  const profile = await prisma.slaProfile.findUnique({
+    where: { id },
+    include: {
+      businessHours: { include: { holidays: true } }, targets: true,
+      escalations: { include: { escalateToTeam: true }, orderBy: [{ clock: "asc" }, { atPercent: "asc" }] },
+      categories: { select: { name: true, parent: { select: { name: true } } } }, teams: { select: { name: true } },
+    },
   });
+  if (!profile) return null;
+  const [priorities, defaultBh] = await Promise.all([
+    prisma.priority.findMany({ where: { isActive: true }, orderBy: { level: "asc" } }),
+    prisma.businessHours.findFirst({ where: { isDefault: true }, include: { holidays: true } }),
+  ]);
+  return { profile, priorities, calendar: profile.businessHours ?? defaultBh };
+}
+
+const targetRow = z.object({
+  priorityId: z.string().min(1),
+  responseMinutes: z.number().int().min(1, "Response time must be at least 1 minute").max(525_600),
+  resolutionMinutes: z.number().int().min(1, "Resolution time must be at least 1 minute").max(1_051_200),
+  businessHoursOnly: z.boolean(),
+});
+
+export async function saveSlaTargets(actor: Actor, profileId: string, raw: unknown) {
+  requirePermission(actor, P.ADMIN_SLA);
+  const parsed = z.array(targetRow).min(1).safeParse(raw);
+  if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid targets");
+  const rows = parsed.data;
+  const errs: Record<string, string> = {};
+  for (const r of rows) if (r.resolutionMinutes < r.responseMinutes) errs[r.priorityId] = "Resolution time must not be shorter than response time";
+  if (Object.keys(errs).length) throw new ValidationError("Resolution time must not be shorter than response time.", errs);
+  const profile = await prisma.slaProfile.findUnique({ where: { id: profileId }, include: { targets: true } });
+  if (!profile) throw new ValidationError("Unknown SLA profile.");
+  const before = profile.targets.map((t) => ({ priorityId: t.priorityId, responseMinutes: t.responseMinutes, resolutionMinutes: t.resolutionMinutes, businessHoursOnly: t.businessHoursOnly }));
+  await prisma.$transaction(async (tx) => {
+    for (const r of rows) {
+      await tx.slaTarget.upsert({
+        where: { slaProfileId_priorityId: { slaProfileId: profileId, priorityId: r.priorityId } },
+        update: { responseMinutes: r.responseMinutes, resolutionMinutes: r.resolutionMinutes, businessHoursOnly: r.businessHoursOnly },
+        create: { slaProfileId: profileId, ...r },
+      });
+    }
+    await audit(tx, actor, { action: "SLA_TARGETS_UPDATED", entityType: "SlaProfile", entityId: profileId, oldValue: before, newValue: rows });
+  });
+}
+
+// ───────────────────────────── Business hours ─────────────────────────────
+
+const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const windowSchema = z.object({ start: z.string().regex(HM, "Use HH:MM"), end: z.string().regex(HM, "Use HH:MM") });
+export const businessHoursSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  timezone: z.string().refine((tz) => { try { new Intl.DateTimeFormat("en", { timeZone: tz }); return true; } catch { return false; } }, "Unknown timezone"),
+  isDefault: z.boolean(),
+  schedule: z.record(z.enum(["1", "2", "3", "4", "5", "6", "7"]), z.array(windowSchema).max(3)),
+});
+
+/** Validates windows: end after start, no overlaps, at least one working window in the week. */
+export function validateSchedule(schedule: Record<string, { start: string; end: string }[]>): string | null {
+  const mins = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+  let any = false;
+  for (const [day, windows] of Object.entries(schedule)) {
+    const sorted = [...windows].sort((a, b) => mins(a.start) - mins(b.start));
+    for (let i = 0; i < sorted.length; i++) {
+      const w = sorted[i]!;
+      if (mins(w.end) <= mins(w.start)) return `Day ${day}: end time must be after start time (${w.start}–${w.end}).`;
+      if (i > 0 && mins(w.start) < mins(sorted[i - 1]!.end)) return `Day ${day}: working windows overlap.`;
+      any = true;
+    }
+  }
+  return any ? null : "At least one working window is required.";
+}
+
+export async function listBusinessHours(actor: Actor) {
+  requirePermission(actor, P.ADMIN_SLA);
+  return prisma.businessHours.findMany({ include: { holidays: { orderBy: { date: "asc" } }, _count: { select: { profiles: true } } }, orderBy: { name: "asc" } });
+}
+
+export async function saveBusinessHours(actor: Actor, id: string | null, raw: unknown) {
+  requirePermission(actor, P.ADMIN_SLA);
+  const parsed = businessHoursSchema.safeParse(raw);
+  if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid business hours");
+  const input = parsed.data;
+  const schedule = Object.fromEntries(Object.entries(input.schedule).filter(([, w]) => w.length > 0));
+  const err = validateSchedule(schedule);
+  if (err) throw new ValidationError(err);
+  await prisma.$transaction(async (tx) => {
+    if (input.isDefault) await tx.businessHours.updateMany({ where: { isDefault: true, ...(id ? { NOT: { id } } : {}) }, data: { isDefault: false } });
+    if (id) {
+      const before = await tx.businessHours.findUniqueOrThrow({ where: { id } });
+      if (before.isDefault && !input.isDefault) throw new ValidationError("Choose another default calendar instead of un-setting this one.");
+      await tx.businessHours.update({ where: { id }, data: { name: input.name, timezone: input.timezone, isDefault: input.isDefault, schedule } });
+      await audit(tx, actor, { action: "BUSINESS_HOURS_UPDATED", entityType: "BusinessHours", entityId: id,
+        oldValue: { name: before.name, timezone: before.timezone, schedule: before.schedule }, newValue: { name: input.name, timezone: input.timezone, schedule } });
+    } else {
+      const created = await tx.businessHours.create({ data: { name: input.name, timezone: input.timezone, isDefault: input.isDefault, schedule } });
+      await audit(tx, actor, { action: "BUSINESS_HOURS_CREATED", entityType: "BusinessHours", entityId: created.id, newValue: { name: input.name, timezone: input.timezone, schedule } });
+    }
+  }).catch((e: unknown) => {
+    if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "P2002") throw new ValidationError("A calendar with this name already exists.");
+    throw e;
+  });
+}
+
+/** Manual trigger of the SLA job (ops / demos). */
+export async function runSlaCheckNow(actor: Actor) {
+  requirePermission(actor, P.ADMIN_SLA);
+  const { runSlaSweep } = await import("@/server/jobs/sla-sweep");
+  const result = await runSlaSweep();
+  await prisma.$transaction(async (tx) => audit(tx, actor, { action: "SLA_SWEEP_RUN", entityType: "System", newValue: result }));
+  return result;
 }

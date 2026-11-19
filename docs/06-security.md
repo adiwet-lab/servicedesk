@@ -26,6 +26,8 @@
 | 23 | Realtime data leakage / stale room membership | Events carry signals only; data re-fetched via authorized actions; room joins re-check scope and actor status; internal room limited to internal note readers; periodic re-validation and `session:revoked` push | `realtime/*` (tested) |
 | 24 | Internal note leakage via search/inbox/counters/files | `messageScopeWhere` applied in list, search, inbox preview and unread SQL; message attachments of internal notes refused to non-readers | `services/messages.ts` (tested) |
 | 25 | Chat spam / abuse | 30 messages/min/user rate limit; 10k character limit; upload validation as for tickets | `services/messages.ts` |
+| 26 | Duplicate / racing background actions across replicas | Sweep guarded by an atomic database lease; per-item idempotency (SlaEvents, flags, `overdueNotifiedAt` claim via conditional update); status changes use optimistic concurrency | `jobs/sla-sweep.ts` (tested) |
+| 27 | Untraceable automatic changes | All job actions are audited with actor = System and appear in ticket history; manual "Run SLA check now" is audited with the admin as actor | `jobs/sla-sweep.ts`, `admin/system.ts` |
 | 21 | Dev backdoor in production | Dev login disabled when `NODE_ENV=production` regardless of flag (verified on the standalone build) | `auth.ts` |
 
 ## Hardening backlog

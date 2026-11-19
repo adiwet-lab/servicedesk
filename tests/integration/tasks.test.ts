@@ -229,6 +229,6 @@ describe("ticket edits, supporting teams & escalation", () => {
     expect(t.ownerTeam?.code).toBe("INFRA");
     expect(t.assignments[0]?.type).toBe("ESCALATE");
     const infraLead = await actor("infra");
-    expect(await prisma.notification.count({ where: { userId: infraLead.id, type: "TICKET_ESCALATED" } })).toBe(1);
+    expect(await prisma.notification.count({ where: { userId: infraLead.id, type: "TICKET_ESCALATED", ticketId: t2.id } })).toBe(1);
   });
 });

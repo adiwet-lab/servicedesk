@@ -112,3 +112,25 @@ Implemented in `src/server/domain/task-workflow.ts` (pure, unit-tested) and `src
 - **Automation**: the first public reply by support staff sets *first response* (SLA); a requester reply to a WAITING ticket moves it to the configured status (default *In Progress*, only if the workflow allows that transition; setting `workflow.requesterReplyStatusCode`).
 - **Notifications**: in-app, realtime (toast + live bell). Chat notifications are coalesced per ticket while unread. Recipients: staff public reply → requester; requester message → responsible agent + active task assignees (or owner team if unassigned); internal note → responsible agent + active task assignees (internal users only). Admins can switch event types off in *Notification Settings*.
 - Every message is audited (`CHAT_MESSAGE` / `INTERNAL_NOTE` with excerpt, `ATTACHMENT_ADDED`).
+
+## SLA (Phase 4)
+**Profile selection**: subcategory → category → owner team → default profile; targets per **priority** (response, resolution, business-hours or 24×7). Defaults: P1 15 min / 4 h (24×7), P2 30 min / 8 h (24×7), P3 4 h / 3 business days, P4 1 business day / 5 business days — all editable (Admin → SLA Profiles → Targets).
+
+**Clocks**
+| Clock | Starts | Met when | Pauses |
+|---|---|---|---|
+| Response | ticket creation | first staff action out of NEW, assignment of an agent, or first public staff chat reply | while in a pause status (until met) |
+| Resolution | ticket creation | ticket reaches a RESOLVED-kind status (reopen continues the clock) | while in a pause status; stopped while resolved |
+
+- **Pause conditions** are per profile (`pauseStatusCodes`, default *Waiting for User*, *Waiting for Third Party*); if a profile lists none, each status's own *Pauses SLA* flag applies. Paused time is measured in business minutes and added to the due dates on resume.
+- **States**: On Track → Warning (≥ profile warning %, default 75%) → Breached (≥ 100%); Paused; Completed Within SLA / Completed Late.
+- **Business hours**: per calendar timezone and weekly windows (split shifts supported); holidays excluded; 24×7 targets ignore the calendar.
+
+**SLA job (every minute)**
+1. Warning → `SLA_WARNING` notification (responsible agent or owner team + team leads), `SlaEvent WARNING`, audit.
+2. Breach → `responseBreached` / `resolutionBreached` flags, `SLA_BREACHED` notification, `SlaEvent BREACHED`, audit.
+3. Escalation rules (profile, clock, at %): notify owner-team leads and/or transfer to an escalation team (`TicketAssignment ESCALATE`, actor System). Each rule fires once per ticket.
+4. Overdue tasks → `TASK_OVERDUE` once per task.
+5. Auto-close resolved tickets after `tickets.autoCloseResolvedDays` (0 = off), via the workflow's Resolved → Closed transition.
+
+Ops: "Run SLA check now" on the SLA Profiles page; `pnpm jobs:run` for external schedulers; `JOBS_ENABLED=false` disables the in-process runner.

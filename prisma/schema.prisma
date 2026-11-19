@@ -87,6 +87,7 @@ enum SlaEventType {
   WARNING
   BREACHED
   MET
+  ESCALATED
 }
 
 enum ImpactScope {
@@ -445,62 +446,68 @@ model WorkflowTransition {
 // ───────────────────────────── Tickets ─────────────────────────────
 
 model Ticket {
-  id                 String       @id @default(cuid())
-  number             String       @unique
-  subject            String
-  description        String
-  categoryId         String
-  category           Category     @relation("TicketCategory", fields: [categoryId], references: [id])
-  subcategoryId      String?
-  subcategory        Category?    @relation("TicketSubcategory", fields: [subcategoryId], references: [id])
-  priorityId         String
-  priority           Priority     @relation(fields: [priorityId], references: [id])
-  statusId           String
-  status             TicketStatus @relation(fields: [statusId], references: [id])
-  requesterId        String
-  requester          User         @relation("TicketRequester", fields: [requesterId], references: [id])
-  createdById        String
-  createdBy          User         @relation("TicketCreatedBy", fields: [createdById], references: [id])
-  companyId          String?
-  company            Company?     @relation(fields: [companyId], references: [id])
-  departmentId       String?
-  department         Department?  @relation(fields: [departmentId], references: [id])
-  branchId           String?
-  branch             Branch?      @relation(fields: [branchId], references: [id])
-  locationId         String?
-  location           Location?    @relation(fields: [locationId], references: [id])
-  contactNumber      String?
-  relatedAsset       String?
-  affectedSystem     String?
-  affectedUsers      String?
-  ownerTeamId        String?
-  ownerTeam          SupportTeam? @relation("TicketOwnerTeam", fields: [ownerTeamId], references: [id])
-  assignedAgentId    String?
-  assignedAgent      User?        @relation("TicketAgent", fields: [assignedAgentId], references: [id])
-  isConfidential     Boolean      @default(false)
-  waitingReason      String?
-  resolutionSummary  String?
+  id                  String       @id @default(cuid())
+  number              String       @unique
+  subject             String
+  description         String
+  categoryId          String
+  category            Category     @relation("TicketCategory", fields: [categoryId], references: [id])
+  subcategoryId       String?
+  subcategory         Category?    @relation("TicketSubcategory", fields: [subcategoryId], references: [id])
+  priorityId          String
+  priority            Priority     @relation(fields: [priorityId], references: [id])
+  statusId            String
+  status              TicketStatus @relation(fields: [statusId], references: [id])
+  requesterId         String
+  requester           User         @relation("TicketRequester", fields: [requesterId], references: [id])
+  createdById         String
+  createdBy           User         @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  companyId           String?
+  company             Company?     @relation(fields: [companyId], references: [id])
+  departmentId        String?
+  department          Department?  @relation(fields: [departmentId], references: [id])
+  branchId            String?
+  branch              Branch?      @relation(fields: [branchId], references: [id])
+  locationId          String?
+  location            Location?    @relation(fields: [locationId], references: [id])
+  contactNumber       String?
+  relatedAsset        String?
+  affectedSystem      String?
+  affectedUsers       String?
+  ownerTeamId         String?
+  ownerTeam           SupportTeam? @relation("TicketOwnerTeam", fields: [ownerTeamId], references: [id])
+  assignedAgentId     String?
+  assignedAgent       User?        @relation("TicketAgent", fields: [assignedAgentId], references: [id])
+  isConfidential      Boolean      @default(false)
+  waitingReason       String?
+  resolutionSummary   String?
   // SLA (Phase 4 computes these; Phase 1 stores targets from profile on create)
-  slaProfileId       String?
-  slaProfile         SlaProfile?  @relation(fields: [slaProfileId], references: [id])
-  responseDueAt      DateTime?
-  resolutionDueAt    DateTime?
-  firstResponseAt    DateTime?
-  slaPausedAt        DateTime?
-  slaPausedMinutes   Int          @default(0)
-  responseBreached   Boolean      @default(false)
-  resolutionBreached Boolean      @default(false)
-  resolvedAt         DateTime?
-  closedAt           DateTime?
+  slaProfileId        String?
+  slaProfile          SlaProfile?  @relation(fields: [slaProfileId], references: [id])
+  responseDueAt       DateTime?
+  resolutionDueAt     DateTime?
+  firstResponseAt     DateTime?
+  slaPausedAt         DateTime?
+  /// Accumulated paused time in BUSINESS minutes of the ticket's SLA calendar (wall minutes for 24x7 targets)
+  slaPausedMinutes    Int          @default(0)
+  /// SLA target snapshot (minutes) taken at creation and on priority/category change
+  responseTargetMin   Int?
+  resolutionTargetMin Int?
+  /// true = targets measured in the profile's business hours; false = 24x7
+  slaBusinessHours    Boolean      @default(true)
+  responseBreached    Boolean      @default(false)
+  resolutionBreached  Boolean      @default(false)
+  resolvedAt          DateTime?
+  closedAt            DateTime?
   // Roadmap (Phase 6)
-  impactScope        ImpactScope?
-  isMajorIncident    Boolean      @default(false)
-  parentIncidentId   String?
-  parentIncident     Ticket?      @relation("IncidentChildren", fields: [parentIncidentId], references: [id])
-  childTickets       Ticket[]     @relation("IncidentChildren")
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  deletedAt          DateTime?
+  impactScope         ImpactScope?
+  isMajorIncident     Boolean      @default(false)
+  parentIncidentId    String?
+  parentIncident      Ticket?      @relation("IncidentChildren", fields: [parentIncidentId], references: [id])
+  childTickets        Ticket[]     @relation("IncidentChildren")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  deletedAt           DateTime?
 
   history         TicketHistory[]
   assignments     TicketAssignment[]
@@ -574,30 +581,31 @@ model TicketSupportingTeam {
 }
 
 model TicketTask {
-  id              String             @id @default(cuid())
-  number          String             @unique
-  ticketId        String
-  ticket          Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  title           String
-  description     String?
-  teamId          String?
-  team            SupportTeam?       @relation(fields: [teamId], references: [id])
-  assignedAgentId String?
-  assignedAgent   User?              @relation("TaskAgent", fields: [assignedAgentId], references: [id])
-  priorityId      String?
-  priority        Priority?          @relation(fields: [priorityId], references: [id])
-  status          TaskStatus         @default(OPEN)
-  isRequired      Boolean            @default(true)
-  startDate       DateTime?
-  dueDate         DateTime?
-  completedAt     DateTime?
-  createdById     String
-  createdBy       User               @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  assignments     TaskAssignment[]
-  history         TaskHistory[]
-  attachments     TicketAttachment[]
+  id                String             @id @default(cuid())
+  number            String             @unique
+  ticketId          String
+  ticket            Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  teamId            String?
+  team              SupportTeam?       @relation(fields: [teamId], references: [id])
+  assignedAgentId   String?
+  assignedAgent     User?              @relation("TaskAgent", fields: [assignedAgentId], references: [id])
+  priorityId        String?
+  priority          Priority?          @relation(fields: [priorityId], references: [id])
+  status            TaskStatus         @default(OPEN)
+  isRequired        Boolean            @default(true)
+  startDate         DateTime?
+  dueDate           DateTime?
+  completedAt       DateTime?
+  overdueNotifiedAt DateTime?
+  createdById       String
+  createdBy         User               @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  assignments       TaskAssignment[]
+  history           TaskHistory[]
+  attachments       TicketAttachment[]
 
   @@index([ticketId])
   @@index([teamId])
@@ -771,6 +779,7 @@ model SlaEvent {
   createdAt DateTime     @default(now())
 
   @@index([ticketId, createdAt])
+  @@index([ticketId, clock, type])
 }
 
 model EscalationRule {

@@ -7,6 +7,7 @@ import { createServer } from "node:http";
 import next from "next";
 import { prisma } from "@/server/db";
 import { createRealtimeServer } from "@/server/realtime/socket-server";
+import { startJobRunner } from "@/server/jobs/runner";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT ?? 3000);
@@ -31,6 +32,10 @@ async function main() {
   if (!secret) console.warn("[realtime] AUTH_SECRET is not set — realtime connections will be rejected");
   const allowedOrigins = [appUrl, ...(dev ? [`http://localhost:${port}`, `http://127.0.0.1:${port}`] : [])];
   createRealtimeServer(server, { db: prisma, secret, allowedOrigins, redisUrl: process.env.REDIS_URL || undefined });
+
+  if (process.env.JOBS_ENABLED !== "false") {
+    startJobRunner({ intervalSeconds: Number(process.env.JOBS_INTERVAL_SECONDS ?? 60) });
+  }
 
   server.listen(port, hostname, () => {
     console.log(`> Service Desk ready on http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port} (${dev ? "development" : "production"}, realtime enabled)`);

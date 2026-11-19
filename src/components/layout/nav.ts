@@ -57,9 +57,10 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Priority", href: "/admin/config/priorities", icon: "flag", perm: P.ADMIN_CATEGORIES },
         { label: "Status", href: "/admin/config/statuses", icon: "list", perm: P.ADMIN_WORKFLOW },
         { label: "Workflow", href: "/admin/config/workflow", icon: "workflow", perm: P.ADMIN_WORKFLOW },
-        { label: "SLA & Business Hours", href: "/admin/config/sla", icon: "timer", perm: P.ADMIN_SLA },
+        { label: "SLA Profiles", href: "/admin/config/sla", icon: "timer", perm: P.ADMIN_SLA },
+        { label: "Business Hours", href: "/admin/config/business-hours", icon: "clock", perm: P.ADMIN_SLA },
         { label: "Holidays", href: "/admin/config/holidays", icon: "calendar", perm: P.ADMIN_SLA },
-        { label: "Escalation Rules", href: "/admin/soon/escalation-rules", icon: "alert", perm: P.ADMIN_SLA, soon: "P4" },
+        { label: "Escalation Rules", href: "/admin/config/escalations", icon: "alert", perm: P.ADMIN_SLA },
       ],
     },
     {

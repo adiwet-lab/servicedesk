@@ -23,7 +23,7 @@ import { audit } from "./audit";
 import { nextNumber } from "./numbering";
 import { notifyUsers, teamMemberIds } from "./notifications";
 import { getSettings } from "./settings";
-import { computeSlaTargets } from "./sla";
+import { applyStatusChange, computeSlaTargets, recordFirstResponse, startClocks } from "./sla";
 
 // ───────────────────────────── Listing ─────────────────────────────
 
@@ -64,9 +64,9 @@ function viewWhere(actor: Actor, view: TicketView, now: Date): Prisma.TicketWher
     case "assigned":
       return { assignedAgentId: actor.id };
     case "overdue":
-      return { resolutionDueAt: { lt: now }, ...active };
+      return { resolutionDueAt: { lt: now }, slaPausedAt: null, ...active };
     case "breached":
-      return { OR: [{ resolutionBreached: true }, { responseBreached: true }, { resolutionDueAt: { lt: now }, ...active }] };
+      return { OR: [{ resolutionBreached: true }, { responseBreached: true }, { resolutionDueAt: { lt: now }, slaPausedAt: null, ...active }] };
     case "all":
     default:
       return {};
@@ -83,6 +83,7 @@ export const ticketListInclude = {
   branch: { select: { id: true, name: true } },
   ownerTeam: { select: { id: true, name: true, code: true } },
   assignedAgent: { select: { id: true, displayName: true } },
+  slaEvents: { where: { type: "WARNING" }, select: { clock: true }, take: 2 },
 } satisfies Prisma.TicketInclude;
 
 export type TicketListRow = Prisma.TicketGetPayload<{ include: typeof ticketListInclude }>;
@@ -139,7 +140,7 @@ export async function ticketSummary(actor: Actor, narrow: Prisma.TicketWhereInpu
   const [groups, statuses, overdue] = await Promise.all([
     prisma.ticket.groupBy({ by: ["statusId"], where, _count: { _all: true } }),
     prisma.ticketStatus.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }),
-    prisma.ticket.count({ where: { AND: [where, { resolutionDueAt: { lt: now }, status: { kind: { in: ACTIVE_KINDS } } }] } }),
+    prisma.ticket.count({ where: { AND: [where, { resolutionDueAt: { lt: now }, slaPausedAt: null, status: { kind: { in: ACTIVE_KINDS } } }] } }),
   ]);
   const byStatus = new Map(groups.map((g) => [g.statusId, g._count._all]));
   const total = groups.reduce((a, g) => a + g._count._all, 0);
@@ -408,6 +409,7 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
       await tx.ticketHistory.create({
         data: { ticketId: ticket.id, actorId: actor.id, action: "CREATED", newValue: `${number} — ${input.subject}` },
       });
+      await startClocks(tx, ticket.id, sla.responseTargetMin != null);
       if (routing.teamId) {
         await tx.ticketAssignment.create({
           data: {
@@ -499,15 +501,12 @@ export async function changeTicketStatus(
     upd.closedAt = null;
   }
   // First response = first status change by support staff out of NEW.
-  if (!ticket.firstResponseAt && canWork && !isRequester && fromKind === "NEW") upd.firstResponseAt = now;
-  // SLA pause bookkeeping (full pause-aware recalculation arrives in Phase 4).
-  if (to.pausesSla && !ticket.slaPausedAt) upd.slaPausedAt = now;
-  if (!to.pausesSla && ticket.slaPausedAt) {
-    upd.slaPausedAt = null;
-    upd.slaPausedMinutes = ticket.slaPausedMinutes + Math.round((now.getTime() - ticket.slaPausedAt.getTime()) / 60000);
-  }
+  const firstResponse = !ticket.firstResponseAt && canWork && !isRequester && fromKind === "NEW";
 
   await transaction(async (tx) => {
+    // SLA: pause/resume per profile pause conditions, resolution met/breached, response met.
+    Object.assign(upd, await applyStatusChange(tx, ticket, to, now));
+    if (firstResponse) Object.assign(upd, await recordFirstResponse(tx, ticket, now));
     // Optimistic concurrency: only succeeds if status unchanged since we read it.
     const res = await tx.ticket.updateMany({ where: { id: ticket.id, statusId: ticket.statusId }, data: upd as Prisma.TicketUncheckedUpdateManyInput });
     if (res.count !== 1) throw new ValidationError("The ticket was changed by someone else. Please reload and try again.");
@@ -563,7 +562,7 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
   const settings = await getSettings(prisma);
 
   // Auto-advance NEW → "Assigned" status when an agent is assigned and the workflow allows it.
-  let autoStatus: { id: string; name: string } | null = null;
+  let autoStatus: { id: string; name: string; code: string; kind: StatusKind; pausesSla: boolean } | null = null;
   if (newAgentId && ticket.status.kind === "NEW") {
     const assigned = await prisma.ticketStatus.findFirst({ where: { code: settings["workflow.assignedStatusCode"], isActive: true } });
     if (assigned) {
@@ -573,12 +572,16 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
   }
 
   await transaction(async (tx) => {
+    const now = new Date();
+    const slaData = autoStatus
+      ? { ...(await applyStatusChange(tx, ticket, autoStatus, now)), ...(await recordFirstResponse(tx, ticket, now)) }
+      : {};
     await tx.ticket.update({
       where: { id: ticket.id },
       data: {
         ownerTeamId: newTeamId, assignedAgentId: newAgentId,
         ...(autoStatus ? { statusId: autoStatus.id } : {}),
-        ...(autoStatus && !ticket.firstResponseAt ? { firstResponseAt: new Date() } : {}),
+        ...slaData,
       },
     });
     await tx.ticketAssignment.create({

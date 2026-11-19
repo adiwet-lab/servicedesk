@@ -14,6 +14,7 @@ import { validateUploads, type UploadCandidate } from "@/server/storage/validate
 import { audit } from "./audit";
 import { notifyUsers, teamMemberIds } from "./notifications";
 import { getSettings } from "./settings";
+import { applyStatusChange, recordFirstResponse, ticketSlaSelect } from "./sla";
 
 const postSchema = z.object({
   type: z.enum(["PUBLIC", "INTERNAL"]).default("PUBLIC"),
@@ -27,8 +28,8 @@ async function loadChatTicket(actor: Actor, ticketId: string) {
   const ticket = await prisma.ticket.findFirst({
     where: { AND: [ticketScopeWhere(actor), { OR: [{ id: ticketId }, { number: ticketId }] }] },
     select: {
-      id: true, number: true, subject: true, requesterId: true, ownerTeamId: true, assignedAgentId: true, firstResponseAt: true, statusId: true,
-      status: { select: { kind: true, pausesSla: true, name: true } }, slaPausedAt: true, slaPausedMinutes: true,
+      number: true, subject: true, requesterId: true, ownerTeamId: true, assignedAgentId: true, statusId: true,
+      status: { select: { kind: true, pausesSla: true, name: true } }, ...ticketSlaSelect,
     },
   });
   if (!ticket) throw new NotFoundError("Ticket not found or you do not have access.");
@@ -150,13 +151,13 @@ export async function postMessage(actor: Actor, ticketId: string, raw: unknown, 
   const isRequester = ticket.requesterId === actor.id;
   const isStaff = !isRequester && (canWorkTicket(actor, ctx) || ctx.tasks.length > 0 || actor.teamIds.length > 0);
   // Requester reply resumes a WAITING ticket (configurable; only if the workflow allows that transition).
-  let resume: { id: string; name: string } | null = null;
+  let resume: { id: string; name: string; code: string; kind: "NEW" | "OPEN" | "WAITING" | "RESOLVED" | "CLOSED" | "CANCELLED"; pausesSla: boolean } | null = null;
   const resumeCode = settings["workflow.requesterReplyStatusCode"];
   if (type === "PUBLIC" && isRequester && ticket.status.kind === "WAITING" && resumeCode) {
     const target = await prisma.ticketStatus.findFirst({ where: { code: resumeCode, isActive: true } });
     if (target && target.id !== ticket.statusId) {
       const tr = await prisma.workflowTransition.findUnique({ where: { fromStatusId_toStatusId: { fromStatusId: ticket.statusId, toStatusId: target.id } } });
-      if (tr) resume = { id: target.id, name: target.name };
+      if (tr) resume = target;
     }
   }
 
@@ -180,7 +181,7 @@ export async function postMessage(actor: Actor, ticketId: string, raw: unknown, 
       await tx.messageRead.create({ data: { messageId: m.id, userId: actor.id } });
 
       if (type === "PUBLIC" && isStaff && !ticket.firstResponseAt) {
-        await tx.ticket.update({ where: { id: ticket.id }, data: { firstResponseAt: now } });
+        await tx.ticket.update({ where: { id: ticket.id }, data: { ...(await recordFirstResponse(tx, ticket, now)), updatedAt: now } });
         await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorId: actor.id, action: "FIRST_RESPONSE", newValue: "First response via chat" } });
       } else {
         await tx.ticket.update({ where: { id: ticket.id }, data: { updatedAt: now } });
@@ -188,12 +189,11 @@ export async function postMessage(actor: Actor, ticketId: string, raw: unknown, 
       if (resume) {
         const moved = await tx.ticket.updateMany({
           where: { id: ticket.id, statusId: ticket.statusId },
-          data: {
-            statusId: resume.id, waitingReason: null,
-            ...(ticket.slaPausedAt ? { slaPausedAt: null, slaPausedMinutes: ticket.slaPausedMinutes + Math.round((now.getTime() - ticket.slaPausedAt.getTime()) / 60000) } : {}),
-          },
+          data: { statusId: resume.id, waitingReason: null },
         });
         if (moved.count === 1) {
+          const slaData = await applyStatusChange(tx, ticket, resume, now);
+          if (Object.keys(slaData).length) await tx.ticket.update({ where: { id: ticket.id }, data: slaData });
           await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorId: actor.id, action: "STATUS_CHANGED", field: "status", oldValue: ticket.status.name, newValue: resume.name, reason: "Auto on requester reply" } });
           await audit(tx, actor, { action: "STATUS_CHANGED", entityType: "Ticket", entityId: ticket.id, ticketId: ticket.id, oldValue: { status: ticket.status.name }, newValue: { status: resume.name, reason: "Requester reply" } });
         }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft, CheckCircle2, Clock, Download, FileText, History, ListChecks, Lock, MessageSquare, Paperclip, Trash2, UserCheck,
+  ArrowLeft, CheckCircle2, Download, FileText, History, ListChecks, Lock, MessageSquare, Paperclip, Trash2, UserCheck,
 } from "lucide-react";
 import { prisma } from "@/server/db";
 import type { Actor } from "@/server/authz/actor";
@@ -22,7 +22,8 @@ import { Alert, Avatar } from "@/components/ui/misc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatAging, formatBytes, formatDateTime } from "@/lib/utils";
-import { PriorityBadge, SlaBadge, StatusBadge } from "./badges";
+import { PriorityBadge, StatusBadge } from "./badges";
+import { SlaCard } from "./sla-card";
 import { AssignDialog, AttachmentUploader, StatusChanger } from "./ticket-actions";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -175,19 +176,7 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
           <TeamsCard ticketId={t.id} owner={t.ownerTeam ? { id: t.ownerTeam.id, name: t.ownerTeam.name } : null} agent={t.assignedAgent?.displayName ?? null}
             supporting={t.supportingTeams.map((s) => s.team)} openTasksByTeam={detail.openTasksByTeam} canManage={perm.canManageSupportingTeams}
             teams={editOptions?.teams ?? []} />
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Clock className="size-4" /> SLA</CardTitle></CardHeader>
-            <CardContent>
-              <dl>
-                <Row label="Profile">{t.slaProfile?.name}</Row>
-                <Row label="State"><SlaBadge ticket={t} warningPercent={t.slaProfile?.warningPercent} /></Row>
-                <Row label="Response due">{formatDateTime(t.responseDueAt)}</Row>
-                <Row label="First response">{formatDateTime(t.firstResponseAt)}</Row>
-                <Row label="Resolution due">{formatDateTime(t.resolutionDueAt)}</Row>
-                <Row label="Resolved">{formatDateTime(t.resolvedAt)}</Row>
-              </dl>
-            </CardContent>
-          </Card>
+          <SlaCard ticketId={t.id} />
           <Card>
             <CardHeader><CardTitle className="text-base">Requester</CardTitle></CardHeader>
             <CardContent className="space-y-3">

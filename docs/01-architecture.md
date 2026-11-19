@@ -36,7 +36,7 @@ Browser ──HTTPS──▶ Next.js (App Router, React Server Components)
 | Validation | zod (shared by forms and services) |
 | Files | `StorageProvider` → local disk (dev) / Azure Blob Storage (prod) |
 | Realtime | Socket.IO on a custom Node server (`server.ts`) sharing the Next port; optional Redis adapter (`REDIS_URL`) for scale-out (Azure Cache for Redis) |
-| Jobs (Phase 4) | `JobRunner` interface — in-process scheduler first, movable to Azure Functions / Container Apps Jobs |
+| Jobs | In-process `JobRunner` (server.ts, every `JOBS_INTERVAL_SECONDS`) guarded by a database lease; `pnpm jobs:run` for Azure Container Apps Jobs / Functions / cron |
 | Tests | Vitest (unit + integration with throwaway DB), Playwright (E2E) |
 | Deploy | Docker multi-stage (Next standalone), docker-compose for local; Azure Container Apps / App Service + Azure Database for PostgreSQL Flexible Server + Blob Storage + Key Vault |
 
@@ -68,3 +68,9 @@ Browser ──socket.io (same origin, session cookie)──▶ server.ts ── 
 - **Room authorization.** `ticket:join` re-loads the actor (status, tenant, expiry, session version) and checks `ticketScopeWhere`; the internal room requires `note.internal.read` and an internal tenant. Sockets are re-validated every 5 minutes; deactivation / "sign out everywhere" pushes `session:revoked`.
 - `audit()` emits a data-less `ticket:changed` for every audited ticket mutation so open ticket pages refresh live (internal-note events go to the internal room only).
 - **Production:** `pnpm build` = `next build` + esbuild bundle of `server.ts` → `dist/server.js`; `pnpm start` runs it. The reverse proxy (Front Door / App Gateway / Container Apps ingress) must allow WebSocket upgrades on `/socket.io`. For >1 replica set `REDIS_URL` (sticky sessions not required with the websocket transport; enable them if the polling fallback is needed).
+
+## SLA engine & scheduled jobs (Phase 4)
+- **Pure clock engine** (`src/server/domain/sla-engine.ts`): business-minute arithmetic (timezone, working windows incl. split shifts, holidays) and clock evaluation. Both clocks share one pause ledger per ticket: `dueAt = addBusinessMinutes(createdAt, target + pausedBusinessMinutes)`.
+- **Target snapshot** on the ticket (`responseTargetMin`, `resolutionTargetMin`, `slaBusinessHours`) so profile edits don't retroactively change open tickets; re-snapshotted on priority/category change and escalation.
+- **Event-driven updates** in services (`applyStatusChange`, `recordFirstResponse`) inside the same transaction as the status change; every clock transition is an `SlaEvent`.
+- **Sweep job** (`src/server/jobs/sla-sweep.ts`): warnings, breaches, escalation rules, overdue-task notifications, auto-close, backfill. Idempotent (effects recorded as events/flags), one item per transaction, multi-instance safe via a lease row in `SystemSetting` (atomic `INSERT … ON CONFLICT … WHERE expired`). System actions are audited with actor = System (null).

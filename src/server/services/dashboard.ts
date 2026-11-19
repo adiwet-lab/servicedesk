@@ -20,19 +20,21 @@ export async function getDashboardStats(actor: Actor, opts: { days?: number } = 
   const now = new Date();
   const active = { status: { kind: { in: ACTIVE_KINDS } } };
 
-  const [byStatus, byCategory, byTeam, byPriority, overdue, statuses, categories, teams, priorities, recent, resolved, unassigned] = await Promise.all([
+  const [byStatus, byCategory, byTeam, byPriority, overdue, statuses, categories, teams, priorities, recent, resolved, unassigned, breachedCount] = await Promise.all([
     prisma.ticket.groupBy({ by: ["statusId"], where: scope, _count: { _all: true } }),
     prisma.ticket.groupBy({ by: ["categoryId"], where: scope, _count: { _all: true } }),
     prisma.ticket.groupBy({ by: ["ownerTeamId"], where: scope, _count: { _all: true } }),
     prisma.ticket.groupBy({ by: ["priorityId"], where: { AND: [scope, active] }, _count: { _all: true } }),
-    prisma.ticket.count({ where: { AND: [scope, active, { resolutionDueAt: { lt: now } }] } }),
+    prisma.ticket.count({ where: { AND: [scope, active, { resolutionDueAt: { lt: now }, slaPausedAt: null }] } }),
     prisma.ticketStatus.findMany({ orderBy: { order: "asc" } }),
     prisma.category.findMany({ where: { parentId: null }, select: { id: true, name: true } }),
     prisma.supportTeam.findMany({ select: { id: true, name: true } }),
     prisma.priority.findMany({ orderBy: { level: "asc" } }),
     prisma.ticket.findMany({ where: { AND: [scope, { createdAt: { gte: since } }] }, select: { createdAt: true, resolvedAt: true } }),
-    prisma.ticket.findMany({ where: { AND: [scope, { resolvedAt: { not: null } }] }, select: { createdAt: true, resolvedAt: true, resolutionDueAt: true, firstResponseAt: true, responseDueAt: true }, take: 5000, orderBy: { resolvedAt: "desc" } }),
+    prisma.ticket.findMany({ where: { AND: [scope, { resolvedAt: { not: null } }] }, select: { createdAt: true, resolvedAt: true, resolutionDueAt: true, firstResponseAt: true, responseDueAt: true, resolutionTargetMin: true, resolutionBreached: true }, take: 5000, orderBy: { resolvedAt: "desc" } }),
     prisma.ticket.count({ where: { AND: [scope, active, { assignedAgentId: null }] } }),
+    // SLA breached = any clock breached (recorded by the SLA job / at resolution) or open & past due while running.
+    prisma.ticket.count({ where: { AND: [scope, { OR: [{ responseBreached: true }, { resolutionBreached: true }, { AND: [active, { resolutionDueAt: { lt: now }, slaPausedAt: null }] }] }] } }),
   ]);
 
   const sMap = new Map(statuses.map((s) => [s.id, s]));
@@ -40,10 +42,9 @@ export async function getDashboardStats(actor: Actor, opts: { days?: number } = 
   const kindCount = (k: string) => byStatus.filter((g) => sMap.get(g.statusId)?.kind === k).reduce((a, g) => a + g._count._all, 0);
   const total = byStatus.reduce((a, g) => a + g._count._all, 0);
 
-  // Breached = open & past due (overdue) + resolved after the due date (all within scope).
-  const breached = resolved.filter((r) => r.resolutionDueAt && r.resolvedAt! > r.resolutionDueAt).length;
-  const withinSla = resolved.filter((r) => r.resolutionDueAt && r.resolvedAt! <= r.resolutionDueAt).length;
-  const withSla = resolved.filter((r) => r.resolutionDueAt).length;
+  // Compliance = resolved within the (pause-aware, business-hours) resolution SLA / resolved with an SLA.
+  const withSla = resolved.filter((r) => r.resolutionTargetMin != null || r.resolutionDueAt).length;
+  const withinSla = resolved.filter((r) => (r.resolutionTargetMin != null || r.resolutionDueAt) && !r.resolutionBreached).length;
   const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
   const avgResolutionMin = avg(resolved.map((r) => (r.resolvedAt!.getTime() - r.createdAt.getTime()) / 60000));
   const avgResponseMin = avg(resolved.filter((r) => r.firstResponseAt).map((r) => (r.firstResponseAt!.getTime() - r.createdAt.getTime()) / 60000));
@@ -70,7 +71,7 @@ export async function getDashboardStats(actor: Actor, opts: { days?: number } = 
     management,
     kpis: {
       total, new: kindCount("NEW"), open: kindCount("NEW") + kindCount("OPEN") + kindCount("WAITING"), inProgress: kindCount("OPEN"),
-      waiting: kindCount("WAITING"), resolved: kindCount("RESOLVED"), closed: kindCount("CLOSED"), overdue, slaBreached: overdue + breached,
+      waiting: kindCount("WAITING"), resolved: kindCount("RESOLVED"), closed: kindCount("CLOSED"), overdue, slaBreached: breachedCount,
       unassigned, slaCompliance: withSla ? Math.round((withinSla / withSla) * 1000) / 10 : null, avgResponseMin, avgResolutionMin,
     },
     statusCounts,

@@ -468,6 +468,92 @@ const ENTITIES = {
       return { id: r.id, before: null, after: r };
     },
   },
+  slaProfiles: {
+    title: "SLA Profiles", singular: "SLA profile", permission: P.ADMIN_SLA, auditType: "SlaProfile",
+    description: "Profiles are chosen per subcategory → category → support team → default. Targets per priority are edited on each profile's Targets page.",
+    async fields() {
+      const [bhs, statuses] = await Promise.all([
+        prisma.businessHours.findMany({ orderBy: { name: "asc" } }),
+        prisma.ticketStatus.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }),
+      ]);
+      return [
+        { name: "name", label: "Name", type: "text", required: true },
+        { name: "description", label: "Description", type: "textarea" },
+        { name: "businessHoursId", label: "Business hours calendar", type: "select", options: bhs.map((b) => ({ value: b.id, label: b.name })), hint: "Empty = default calendar" },
+        { name: "warningPercent", label: "Warning threshold (% of target elapsed)", type: "number", required: true },
+        { name: "pauseStatusCodes", label: "Pause the SLA clock while the ticket is in", type: "multiselect",
+          options: statuses.filter((st) => st.kind !== "RESOLVED" && st.kind !== "CLOSED" && st.kind !== "CANCELLED").map((st) => ({ value: st.code, label: st.name })),
+          hint: "Empty = use each status's own 'Pauses SLA' flag" },
+        { name: "isDefault", label: "Default profile", type: "checkbox" },
+      ];
+    },
+    columns: [{ key: "name", label: "Profile" }, { key: "calendar", label: "Calendar" }, { key: "warning", label: "Warning" }, { key: "pause", label: "Pauses in" }, { key: "targets", label: "Targets" }, { key: "isDefault", label: "Default", kind: "bool" }],
+    async list() {
+      const rows = await prisma.slaProfile.findMany({ include: { businessHours: true, _count: { select: { targets: true } } }, orderBy: { name: "asc" } });
+      const statuses = await prisma.ticketStatus.findMany();
+      const sName = (c: string) => statuses.find((st) => st.code === c)?.name ?? c;
+      return rows.map((r) => ({
+        id: r.id, isActive: r.isActive,
+        values: { name: r.name, description: r.description, businessHoursId: r.businessHoursId, warningPercent: r.warningPercent, pauseStatusCodes: r.pauseStatusCodes, isDefault: r.isDefault },
+        cells: { name: r.name, calendar: r.businessHours?.name ?? "Default", warning: `${r.warningPercent}%`,
+          pause: ((r.pauseStatusCodes as string[]) ?? []).map(sName).join(", ") || "(status flags)", targets: r._count.targets, isDefault: r.isDefault },
+      }));
+    },
+    async save(tx, id, v) {
+      const warningPercent = Number(v.warningPercent);
+      if (warningPercent < 1 || warningPercent > 100) throw new ValidationError("Warning threshold must be 1–100%.", { warningPercent: "Must be between 1 and 100" });
+      const data = { name: String(v.name), description: s(v.description), businessHoursId: s(v.businessHoursId), warningPercent,
+        pauseStatusCodes: (v.pauseStatusCodes as string[]) ?? [], isDefault: !!v.isDefault };
+      if (data.isDefault) await tx.slaProfile.updateMany({ where: { isDefault: true, ...(id ? { NOT: { id } } : {}) }, data: { isDefault: false } });
+      if (id) {
+        const before = await tx.slaProfile.findUniqueOrThrow({ where: { id } });
+        await tx.slaProfile.update({ where: { id }, data });
+        return { id, before, after: data };
+      }
+      const r = await tx.slaProfile.create({ data });
+      return { id: r.id, before: null, after: r };
+    },
+    async setActive(tx, id, active) {
+      const p = await tx.slaProfile.findUniqueOrThrow({ where: { id } });
+      if (!active && p.isDefault) throw new ValidationError("The default SLA profile cannot be deactivated.");
+      await tx.slaProfile.update({ where: { id }, data: { isActive: active } });
+    },
+  },
+
+  escalations: {
+    title: "Escalation Rules", singular: "Escalation rule", permission: P.ADMIN_SLA, auditType: "EscalationRule",
+    description: "Fired once per ticket by the SLA job when the clock reaches the threshold (100% = breach). Notifies the owner team's leads and can move the ticket to another team.",
+    async fields() {
+      return [
+        { name: "slaProfileId", label: "SLA profile", type: "select", required: true, options: await opt.slaProfiles() },
+        { name: "clock", label: "Clock", type: "select", required: true, options: [{ value: "RESPONSE", label: "Response" }, { value: "RESOLUTION", label: "Resolution" }] },
+        { name: "atPercent", label: "At % of target elapsed", type: "number", required: true, hint: "1–200 (e.g. 75 = warning stage, 100 = breach, 150 = well overdue)" },
+        { name: "notifyTeamLead", label: "Notify owner team leads", type: "checkbox" },
+        { name: "escalateToTeamId", label: "Escalate (transfer) to team", type: "select", options: await opt.teams(), hint: "Optional" },
+      ];
+    },
+    columns: [{ key: "profile", label: "Profile" }, { key: "clock", label: "Clock", kind: "badge" }, { key: "at", label: "At" }, { key: "notify", label: "Notify leads", kind: "bool" }, { key: "team", label: "Escalate to" }],
+    async list() {
+      const rows = await prisma.escalationRule.findMany({ include: { slaProfile: true, escalateToTeam: true }, orderBy: [{ slaProfile: { name: "asc" } }, { clock: "asc" }, { atPercent: "asc" }] });
+      return rows.map((r) => ({ id: r.id, isActive: r.isActive,
+        values: { slaProfileId: r.slaProfileId, clock: r.clock, atPercent: r.atPercent, notifyTeamLead: r.notifyTeamLead, escalateToTeamId: r.escalateToTeamId },
+        cells: { profile: r.slaProfile.name, clock: r.clock, at: `${r.atPercent}%`, notify: r.notifyTeamLead, team: r.escalateToTeam?.name ?? "—" } }));
+    },
+    async save(tx, id, v) {
+      const atPercent = Number(v.atPercent);
+      if (atPercent < 1 || atPercent > 200) throw new ValidationError("Threshold must be 1–200%.", { atPercent: "Must be between 1 and 200" });
+      if (!v.notifyTeamLead && !s(v.escalateToTeamId)) throw new ValidationError("A rule must notify team leads and/or escalate to a team.", { notifyTeamLead: "Choose at least one action" });
+      const data = { slaProfileId: String(v.slaProfileId), clock: String(v.clock) as never, atPercent, notifyTeamLead: !!v.notifyTeamLead, escalateToTeamId: s(v.escalateToTeamId) };
+      if (id) {
+        const before = await tx.escalationRule.findUniqueOrThrow({ where: { id } });
+        await tx.escalationRule.update({ where: { id }, data });
+        return { id, before, after: data };
+      }
+      const r = await tx.escalationRule.create({ data });
+      return { id: r.id, before: null, after: r };
+    },
+    async setActive(tx, id, active) { await tx.escalationRule.update({ where: { id }, data: { isActive: active } }); },
+  },
 } satisfies Record<string, EntityDef>;
 
 export type EntityKey = keyof typeof ENTITIES;

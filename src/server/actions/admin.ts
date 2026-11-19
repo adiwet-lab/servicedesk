@@ -129,3 +129,31 @@ export async function saveNotificationSettingsAction(_prev: ActionResult | null,
   revalidatePath("/admin", "layout");
   return r as ActionResult;
 }
+
+export async function saveSlaTargetsAction(profileId: string, rows: { priorityId: string; responseMinutes: number; resolutionMinutes: number; businessHoursOnly: boolean }[]): Promise<ActionResult> {
+  const r = await runAction(async () => {
+    const actor = await requireActorOrThrow();
+    const { saveSlaTargets } = await import("@/server/services/admin/system");
+    await saveSlaTargets(actor, profileId, rows);
+  }, "SLA targets saved");
+  revalidatePath("/admin", "layout");
+  return r as ActionResult;
+}
+
+export async function saveBusinessHoursAction(id: string | null, payload: unknown): Promise<ActionResult> {
+  const r = await runAction(async () => {
+    const actor = await requireActorOrThrow();
+    const { saveBusinessHours } = await import("@/server/services/admin/system");
+    await saveBusinessHours(actor, id, payload);
+  }, "Business hours saved");
+  revalidatePath("/admin", "layout");
+  return r as ActionResult;
+}
+
+export async function runSlaCheckAction() {
+  return runAction(async () => {
+    const actor = await requireActorOrThrow();
+    const { runSlaCheckNow } = await import("@/server/services/admin/system");
+    return runSlaCheckNow(actor);
+  });
+}
