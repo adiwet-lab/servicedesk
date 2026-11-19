@@ -43,14 +43,15 @@ test("admin edits SLA targets and business hours; runs the SLA check; manages es
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("SLA profile").selectOption({ label: "Standard SLA" });
   await dialog.getByLabel("Clock").selectOption("RESOLUTION");
-  await dialog.getByLabel("At % of target elapsed").fill("180");
+  const pct = String(101 + Math.floor(Math.random() * 99)); // unique per run (dev DB keeps earlier rules)
+  await dialog.getByLabel("At % of target elapsed").fill(pct);
   await dialog.getByText("Enabled").click();
   await dialog.getByTestId("crud-save").click();
   await expect(dialog).toBeHidden();
-  const row = page.getByRole("row", { name: /180%/ });
+  const row = page.getByRole("row").filter({ hasText: `${pct}%` }).filter({ hasText: "Disable" });
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Deactivate" }).click();
-  await expect(row).toContainText("Inactive");
+  await expect(page.getByRole("row").filter({ hasText: `${pct}%` }).filter({ hasText: "Enable" }).first()).toBeVisible();
 });
 
 test("SLA card shows both clocks, pauses while waiting for the user and resumes", async ({ page }) => {

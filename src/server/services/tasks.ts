@@ -472,15 +472,3 @@ export async function listTasks(actor: Actor, view: TaskView, q: TaskListQuery) 
   return { total, rows, page: q.page, pageSize: q.pageSize, pages: Math.max(1, Math.ceil(total / q.pageSize)) };
 }
 
-/** Task KPI counts for dashboards (within scope). */
-export async function taskKpis(actor: Actor) {
-  if (!can(actor, P.TASK_READ)) return null;
-  const scope = taskScopeWhere(actor);
-  const active = { status: { notIn: TASK_TERMINAL } };
-  const [mine, team, overdue] = await Promise.all([
-    prisma.ticketTask.count({ where: { AND: [scope, active, { assignedAgentId: actor.id }] } }),
-    actor.teamIds.length ? prisma.ticketTask.count({ where: { AND: [scope, active, { teamId: { in: actor.teamIds } }] } }) : Promise.resolve(0),
-    prisma.ticketTask.count({ where: { AND: [scope, active, { dueDate: { lt: new Date() } }] } }),
-  ]);
-  return { mine, team, overdue };
-}

@@ -10,6 +10,7 @@ import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { canAssignTicket, canManageTicketTasks, canWorkTicket, taskScopeWhere, ticketScopeWhere } from "@/server/authz/scope";
 import { ACTIVE_KINDS, isTransitionAllowed, validateTransition } from "@/server/domain/workflow";
 import { resolveRouting } from "@/server/domain/routing";
+import { agingRange } from "@/server/domain/analytics";
 import { enforceRateLimit } from "@/server/ratelimit";
 import { getStorage } from "@/server/storage/provider";
 import { validateUploads, type UploadCandidate } from "@/server/storage/validate";
@@ -99,6 +100,11 @@ export async function listTickets(actor: Actor, view: TicketView, q: TicketListQ
   if (q.agent) filters.push({ assignedAgentId: q.agent === "none" ? null : q.agent });
   if (q.branch) filters.push({ branchId: q.branch });
   if (q.department) filters.push({ departmentId: q.department });
+  if (q.subcategory) filters.push({ subcategoryId: q.subcategory });
+  if (q.company) filters.push({ companyId: q.company });
+  if (q.from) filters.push({ createdAt: { gte: new Date(`${q.from}T00:00:00Z`) } });
+  if (q.to) filters.push({ createdAt: { lte: new Date(`${q.to}T23:59:59.999Z`) } });
+  if (q.aging) filters.push({ createdAt: agingRange(q.aging, now), status: { kind: { in: ACTIVE_KINDS } } });
   if (q.q) {
     const s = q.q;
     const ci = { contains: s, mode: "insensitive" as const };

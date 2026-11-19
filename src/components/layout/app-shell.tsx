@@ -41,7 +41,8 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
 
   const isActive = (href: string) => {
     if (href.includes("?")) return current === href || (pathname === href.split("?")[0] && search.get("view") === new URLSearchParams(href.split("?")[1]).get("view"));
-    if (href === "/admin" || href === "/dashboard" || href === "/tickets") return pathname === href;
+    if (href === "/admin") return pathname === "/admin" || /^\/admin\/dashboards\/(management|team|agent)/.test(pathname);
+    if (href === "/dashboard" || href === "/tickets") return pathname === href;
     return pathname === href || pathname.startsWith(href + "/");
   };
 

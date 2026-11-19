@@ -26,6 +26,7 @@ export const PERMISSIONS = {
   // Dashboards
   DASHBOARD_SUPPORT: "dashboard.support",
   DASHBOARD_MANAGEMENT: "dashboard.management",
+  REPORT_EXPORT: "report.export",
   // Administration
   ADMIN_CATEGORIES: "admin.categories",
   ADMIN_WORKFLOW: "admin.workflow",
@@ -59,6 +60,7 @@ export const PERMISSION_META: Record<PermissionCode, { group: string; descriptio
   "task.assign": { group: "Tasks", description: "Assign tasks to teams/agents" },
   "dashboard.support": { group: "Dashboards", description: "Support / team dashboards and admin portal access" },
   "dashboard.management": { group: "Dashboards", description: "Management dashboards across all tickets" },
+  "report.export": { group: "Dashboards", description: "Run reports and export CSV (within own data scope)" },
   "admin.categories": { group: "Administration", description: "Manage categories, priorities and routing" },
   "admin.workflow": { group: "Administration", description: "Manage statuses and workflow transitions" },
   "admin.sla": { group: "Administration", description: "Manage SLA, business hours, holidays" },
@@ -105,7 +107,7 @@ export const DEFAULT_ROLE_MATRIX: Record<RoleCode, { name: string; description: 
   TEAM_LEAD: {
     name: "Support Team Lead",
     description: "Manages team queue, assignment, transfer and escalation",
-    permissions: [...SUPPORT_BASE, P.TICKET_TRANSFER, P.TICKET_ESCALATE, P.TASK_ASSIGN],
+    permissions: [...SUPPORT_BASE, P.TICKET_TRANSFER, P.TICKET_ESCALATE, P.TASK_ASSIGN, P.REPORT_EXPORT],
   },
   SYSTEM_ADMIN: {
     name: "System Admin",
@@ -115,7 +117,7 @@ export const DEFAULT_ROLE_MATRIX: Record<RoleCode, { name: string; description: 
   DASHBOARD_VIEWER: {
     name: "Dashboard Viewer",
     description: "Read-only management dashboards",
-    permissions: [P.TICKET_CREATE, P.TICKET_READ_OWN, P.DASHBOARD_MANAGEMENT],
+    permissions: [P.TICKET_CREATE, P.TICKET_READ_OWN, P.DASHBOARD_MANAGEMENT, P.REPORT_EXPORT],
   },
   OUTSOURCE_SUPPORT: {
     name: "Outsource Support",
@@ -145,7 +147,7 @@ export const VENDOR_FORBIDDEN_PERMISSIONS: PermissionCode[] = [
 
 /** Any of these grants entry into the /admin portal. */
 export const ADMIN_PORTAL_PERMISSIONS: PermissionCode[] = [
-  P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL,
+  P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL, P.REPORT_EXPORT,
   P.ADMIN_CATEGORIES, P.ADMIN_WORKFLOW, P.ADMIN_SLA, P.ADMIN_ORG, P.ADMIN_TEAMS,
   P.ADMIN_USERS, P.ADMIN_ROLES, P.ADMIN_TENANTS, P.ADMIN_SETTINGS, P.AUDIT_READ,
 ];

@@ -98,8 +98,13 @@ const USERS: DemoUser[] = [
 
 async function main() {
   console.log("Seeding permissions & roles…");
+  // Track permission codes introduced since the last seed: they are granted to system roles per the default
+  // matrix below, without touching admin changes made to previously existing codes.
+  const existingCodes = new Set((await prisma.permission.findMany({ select: { code: true } })).map((p) => p.code));
+  const newCodes = new Set<string>();
   for (const code of ALL_PERMISSIONS) {
     const meta = PERMISSION_META[code];
+    if (!existingCodes.has(code)) newCodes.add(code);
     await prisma.permission.upsert({ where: { code }, update: { description: meta.description, group: meta.group }, create: { code, ...meta } });
   }
   const perms = new Map((await prisma.permission.findMany()).map((p) => [p.code, p.id]));
@@ -115,6 +120,12 @@ async function main() {
     const existing = await prisma.rolePermission.count({ where: { roleId: role.id } });
     if (existing === 0) {
       await prisma.rolePermission.createMany({ data: def.permissions.map((p) => ({ roleId: role.id, permissionId: perms.get(p)! })) });
+    } else if (existingCodes.size > 0) {
+      const added = def.permissions.filter((p) => newCodes.has(p));
+      if (added.length) {
+        await prisma.rolePermission.createMany({ data: added.map((p) => ({ roleId: role.id, permissionId: perms.get(p)! })), skipDuplicates: true });
+        console.log(`  granted new permission(s) ${added.join(", ")} to ${code}`);
+      }
     }
   }
 

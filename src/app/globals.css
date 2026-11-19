@@ -30,6 +30,14 @@
   --sidebar-muted: oklch(0.62 0.03 260);
   --sidebar-accent: oklch(0.29 0.04 265);
   --sidebar-primary: oklch(0.72 0.14 250);
+
+  /* Data-viz tokens (validated: categorical order passes CVD/normal-vision gates; ordinal ramp monotone) */
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
+  /* ordinal blue ramp, 1 = strongest (e.g. P1) … 4 = weakest */
+  --ord-1: #0d366b; --ord-2: #1c5cab; --ord-3: #3987e5; --ord-4: #86b6ef;
+  --viz-surface: #fcfcfb; --viz-grid: #e1e0d9; --viz-axis: #c3c2b7; --viz-muted: #898781;
+  --status-good: #0ca30c; --status-warning: #fab219; --status-serious: #ec835a; --status-critical: #d03b3b;
 }
 
 .dark {
@@ -53,6 +61,12 @@
   --ring: oklch(0.68 0.15 255);
   --sidebar: oklch(0.14 0.02 265);
   --sidebar-accent: oklch(0.24 0.03 265);
+
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #0ca30c; --series-7: #9085e9; --series-8: #e66767;
+  /* on dark the strongest step is the lightest */
+  --ord-1: #86b6ef; --ord-2: #3987e5; --ord-3: #256abf; --ord-4: #184f95;
+  --viz-surface: #1a1a19; --viz-grid: #2c2c2a; --viz-axis: #383835; --viz-muted: #898781;
 }
 
 @theme inline {

@@ -134,3 +134,17 @@ Implemented in `src/server/domain/task-workflow.ts` (pure, unit-tested) and `src
 5. Auto-close resolved tickets after `tickets.autoCloseResolvedDays` (0 = off), via the workflow's Resolved → Closed transition.
 
 Ops: "Run SLA check now" on the SLA Profiles page; `pnpm jobs:run` for external schedulers; `JOBS_ENABLED=false` disables the in-process runner.
+
+## Dashboards & reports (Phase 5)
+| Dashboard | Who | Highlights |
+|---|---|---|
+| Management | management viewers, admins | 12 KPIs, created-vs-resolved trend, SLA compliance trend, status/priority/category/subcategory/team/branch/department breakdowns, aging |
+| Team | team leads (admins pick a team) | backlog, unassigned, overdue, breached, member workload, aging, open SLA states, oldest tickets |
+| My work | agents / leads | my assigned, in progress, waiting, overdue, breached, open & overdue tasks, resolved in period, my compliance, next due |
+| SLA | support & management | resolution/response compliance, compliance trend, within/outside SLA per period, by priority, by team (lowest first), breached open list |
+| Ticket aging | support & management | 0–1 / 2–3 / 4–7 / 8–14 / >14 days × priority, drill-down per bucket, oldest tickets |
+| Workload | leads & management | per agent: assigned, in progress, waiting, open tasks, overdue tasks, completed, avg resolution; per team: open, unassigned, overdue, breached, completed |
+
+Filters (URL state, shared by all dashboards and reports): date range presets / custom, company, department, branch, team, category, subcategory, priority, status, agent. Rows in tables link to the filtered ticket list (drill-down), where the dashboard filters appear as removable chips.
+
+Reports: ticket detail, SLA compliance, agent performance, team performance, category summary — preview (50 rows) and CSV export.

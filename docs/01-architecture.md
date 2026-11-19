@@ -74,3 +74,10 @@ Browser ──socket.io (same origin, session cookie)──▶ server.ts ── 
 - **Target snapshot** on the ticket (`responseTargetMin`, `resolutionTargetMin`, `slaBusinessHours`) so profile edits don't retroactively change open tickets; re-snapshotted on priority/category change and escalation.
 - **Event-driven updates** in services (`applyStatusChange`, `recordFirstResponse`) inside the same transaction as the status change; every clock transition is an `SlaEvent`.
 - **Sweep job** (`src/server/jobs/sla-sweep.ts`): warnings, breaches, escalation rules, overdue-task notifications, auto-close, backfill. Idempotent (effects recorded as events/flags), one item per transaction, multi-instance safe via a lease row in `SystemSetting` (atomic `INSERT … ON CONFLICT … WHERE expired`). System actions are audited with actor = System (null).
+
+## Analytics & reporting (Phase 5)
+- `src/server/services/analytics.ts` builds every figure from **one where-clause**: `scope ∧ dimension filters ∧ date window`. Scope is organisation-wide only for management roles (`dashboard.management` / `ticket.read.all`, never vendors); everyone else gets the same `ticketScopeWhere` used by ticket lists, so dashboards can never reveal tickets a user couldn't open.
+- Counts use Prisma `groupBy`/`count`; time series and durations use bounded timestamp queries (50k rows, flagged when capped) bucketed by pure helpers (`src/server/domain/analytics.ts`).
+- Cohorts: volume = tickets **created** in the period (current status); compliance & average times = tickets **resolved** in the period; aging, workload and open-ticket SLA states = **current backlog**.
+- Reports (`services/reports.ts`, `GET /api/reports/[type]`) reuse the same filters/scope, require `report.export`, cap at 50k rows, write UTF-8 BOM CSV with formula-injection escaping, and are audited.
+- For very large datasets, Phase 6 adds a Power BI dataset / snapshot tables; Phase 5 queries live data.

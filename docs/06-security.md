@@ -28,6 +28,8 @@
 | 25 | Chat spam / abuse | 30 messages/min/user rate limit; 10k character limit; upload validation as for tickets | `services/messages.ts` |
 | 26 | Duplicate / racing background actions across replicas | Sweep guarded by an atomic database lease; per-item idempotency (SlaEvents, flags, `overdueNotifiedAt` claim via conditional update); status changes use optimistic concurrency | `jobs/sla-sweep.ts` (tested) |
 | 27 | Untraceable automatic changes | All job actions are audited with actor = System and appear in ticket history; manual "Run SLA check now" is audited with the admin as actor | `jobs/sla-sweep.ts`, `admin/system.ts` |
+| 28 | Data leakage through aggregates / reports | Every dashboard and report query is built from the same scope where-clause as ticket lists; org-wide figures only for management roles (never vendors); drill-down links hidden from aggregate-only viewers | `services/analytics.ts`, `services/reports.ts` (tested) |
+| 29 | CSV / formula injection, bulk exfiltration | `report.export` permission; cells starting with `= + - @ TAB CR` are prefixed with `'`; 50k row cap; 10 exports/min rate limit; no message bodies or internal notes in any report; every export audited with filters | `domain/analytics.ts`, `api/reports` (tested) |
 | 21 | Dev backdoor in production | Dev login disabled when `NODE_ENV=production` regardless of flag (verified on the standalone build) | `auth.ts` |
 
 ## Hardening backlog

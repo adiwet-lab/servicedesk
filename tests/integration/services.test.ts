@@ -102,7 +102,12 @@ describe("data-scope authorization", () => {
     const v = await actor("vendorA");
     await expect(getTicketDetail(v, printerTicket.number)).rejects.toBeInstanceOf(NotFoundError);
     const list = await listTickets(v, "all", ticketListQuerySchema.parse({}));
-    expect(list.rows.every((r) => r.ownerTeam?.code === "VENDOR-A")).toBe(true);
+    // Visible only if owned by Vendor A or Vendor A has a task on it (multi-team collaboration, Phase 2).
+    const vendorTeam = await prisma.supportTeam.findUniqueOrThrow({ where: { code: "VENDOR-A" } });
+    for (const r of list.rows) {
+      const viaTask = await prisma.ticketTask.count({ where: { ticketId: r.id, teamId: vendorTeam.id } });
+      expect(r.ownerTeam?.code === "VENDOR-A" || viaTask > 0).toBe(true);
+    }
     expect(list.total).toBeGreaterThan(0);
   });
   it("vendor B cannot see vendor A tickets", async () => {

@@ -23,11 +23,20 @@ export function portalNav(actor: Actor): NavSection[] {
   return [{ items }];
 }
 
-type Guarded = NavItem & { perm?: PermissionCode | PermissionCode[] };
+type Guarded = NavItem & { perm?: PermissionCode | PermissionCode[]; /** also visible to team leads */ whenLead?: boolean };
 
 export function adminNav(actor: Actor): NavSection[] {
   const sections: { title?: string; items: Guarded[] }[] = [
-    { items: [{ label: "Dashboard", href: "/admin", icon: "dashboard" }] },
+    {
+      title: "Dashboards & Reports",
+      items: [
+        { label: "Dashboard", href: "/admin", icon: "dashboard" },
+        { label: "SLA Dashboard", href: "/admin/dashboards/sla", icon: "timer", perm: [P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL] },
+        { label: "Ticket Aging", href: "/admin/dashboards/aging", icon: "clock", perm: [P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL] },
+        { label: "Workload", href: "/admin/dashboards/workload", icon: "team", perm: [P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL], whenLead: true },
+        { label: "Reports", href: "/admin/reports", icon: "file", perm: P.REPORT_EXPORT },
+      ],
+    },
     {
       title: "Ticket Management",
       items: [
@@ -98,7 +107,7 @@ export function adminNav(actor: Actor): NavSection[] {
     .map((s) => ({
       title: s.title,
       items: s.items
-        .filter((i) => !i.perm || (Array.isArray(i.perm) ? canAny(actor, i.perm) : can(actor, i.perm)))
+        .filter((i) => !i.perm || (Array.isArray(i.perm) ? canAny(actor, i.perm) : can(actor, i.perm)) || (i.whenLead && actor.leadTeamIds.length > 0))
         .map((i) => ({ label: i.label, href: i.href, icon: i.icon, soon: i.soon, badge: i.badge })),
     }))
     .filter((s) => s.items.length > 0);

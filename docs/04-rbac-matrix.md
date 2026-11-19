@@ -71,6 +71,8 @@ Authorization = **permission** (what) × **data scope** (which rows). Both are e
 | Task visibility | parent ticket visible; vendors only their own team's / own tasks |
 | Read public chat | anyone who can see the ticket (incl. dept/branch observers) |
 | Post public chat message | requester, staff who can work the ticket, task team members/assignees; not observers; closed tickets read-only (except `ticket.closed.edit`) |
+| Dashboards | `dashboard.support` (scoped to own teams/tickets) or `dashboard.management` / `ticket.read.all` (organisation-wide, internal only). Drill-down links only for users who can read tickets |
+| Reports & CSV export | `report.export` (Team Lead, System Admin, Dashboard Viewer, Super Admin by default); always within the user's data scope; audited (`REPORT_EXPORTED`) |
 | Internal notes | read `note.internal.read`, write `note.internal.write`; internal tenants only; filtered in every query (`messageScopeWhere`) incl. search, inbox previews, unread counts, attachment downloads and realtime rooms |
 
 ## Role intent

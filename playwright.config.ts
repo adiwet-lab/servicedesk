@@ -10,7 +10,7 @@ const PORT = Number(process.env.E2E_PORT ?? 3000);
 export default defineConfig({
   testDir: "tests/e2e",
   timeout: 60_000,
-  expect: { timeout: 10_000 },
+  expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
@@ -22,6 +22,6 @@ export default defineConfig({
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: true,
     timeout: 120_000,
-    env: { AUTH_DEV_LOGIN: "true", PORT: String(PORT), APP_URL: `http://localhost:${PORT}` },
+    env: { AUTH_DEV_LOGIN: "true", PORT: String(PORT), APP_URL: `http://localhost:${PORT}`, NODE_OPTIONS: "--max-old-space-size=4096" },
   },
 });

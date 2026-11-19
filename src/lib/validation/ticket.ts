@@ -55,6 +55,13 @@ export const ticketListQuerySchema = z.object({
   agent: optId,
   branch: optId,
   department: optId,
+  subcategory: optId,
+  company: optId,
+  /** Created-date window (YYYY-MM-DD, inclusive) — dashboard drill-down. */
+  from: z.preprocess((v) => (v === "" ? undefined : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()).catch(undefined),
+  to: z.preprocess((v) => (v === "" ? undefined : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()).catch(undefined),
+  /** Open-ticket aging bucket — dashboard drill-down. */
+  aging: z.enum(["0-1", "2-3", "4-7", "8-14", "15+"]).optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(10000).catch(1),
   pageSize: z.coerce.number().int().min(10).max(100).catch(20),
   sort: z.enum(["number", "subject", "createdAt", "updatedAt", "priority", "status", "resolutionDueAt"]).catch("createdAt"),
