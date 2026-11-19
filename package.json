@@ -20,7 +20,8 @@
     "format": "prettier --write .",
     "dev:next": "next dev",
     "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=dist/server.js",
-    "jobs:run": "tsx scripts/run-jobs.ts"
+    "jobs:run": "tsx scripts/run-jobs.ts",
+    "audit:export": "tsx scripts/audit-export.ts"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.34.0",

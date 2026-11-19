@@ -70,17 +70,27 @@ export async function saveSequence(actor: Actor, raw: unknown) {
 
 // ───────────────────────────── Audit log ─────────────────────────────
 
-export async function listAuditLogs(actor: Actor, q: { q?: string; action?: string; entity?: string; actor?: string; from?: string; to?: string; page?: number }) {
-  requirePermission(actor, P.AUDIT_READ);
-  const page = Math.max(1, q.page ?? 1);
-  const take = 50;
-  const where: Prisma.AuditLogWhereInput = {
+export interface AuditQuery { q?: string; action?: string; entity?: string; actor?: string; from?: string; to?: string; page?: number }
+
+const isoDay = (v: string | undefined) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : undefined);
+
+/** Filter shared by the audit list and exports. Invalid dates are ignored. */
+export function auditWhere(raw: AuditQuery): Prisma.AuditLogWhereInput {
+  const q = { ...raw, from: isoDay(raw.from), to: isoDay(raw.to) };
+  return {
     ...(q.action ? { action: q.action } : {}),
     ...(q.entity ? { entityType: q.entity } : {}),
     ...(q.actor ? { actorId: q.actor } : {}),
     ...(q.q ? { OR: [{ entityId: q.q }, { ticket: { number: { contains: q.q, mode: "insensitive" } } }, { actor: { displayName: { contains: q.q, mode: "insensitive" } } }] } : {}),
     ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lte: new Date(`${q.to}T23:59:59.999Z`) } : {}) } } : {}),
   };
+}
+
+export async function listAuditLogs(actor: Actor, q: AuditQuery) {
+  requirePermission(actor, P.AUDIT_READ);
+  const page = Math.max(1, q.page ?? 1);
+  const take = 50;
+  const where = auditWhere(q);
   const [total, rows, actions, entities] = await Promise.all([
     prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({ where, include: { actor: { select: { displayName: true, email: true } }, ticket: { select: { number: true } } },

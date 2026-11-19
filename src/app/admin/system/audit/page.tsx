@@ -26,10 +26,15 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   if (!can(actor, P.AUDIT_READ)) notFound();
   const sp = await searchParams;
   const r = await listAuditLogs(actor, { ...sp, page: Number(sp.page ?? 1) });
+  const exportQs = (format: string) => `/api/audit/export?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([k, v]) => v && k !== "page")) as Record<string, string>, format })}`;
   const qs = (page: number) => `?${new URLSearchParams({ ...(sp as Record<string, string>), page: String(page) })}`;
   return (
     <div>
-      <PageHeader title="Audit Logs" description="Append-only record of security-relevant and data changes. Protected by a database trigger — entries cannot be modified or deleted." />
+      <PageHeader title="Audit Logs" description="Append-only record of security-relevant and data changes. Protected by a database trigger — entries cannot be modified or deleted. Retention: export for archival (default range: last 30 days, max 366)."
+        actions={<div className="flex gap-2">
+          <Button asChild variant="outline"><a href={exportQs("csv")} data-testid="audit-export-csv">Export CSV</a></Button>
+          <Button asChild variant="outline"><a href={exportQs("ndjson")} data-testid="audit-export-ndjson">Export NDJSON</a></Button>
+        </div>} />
       <Card className="overflow-hidden">
         <form method="get" className="flex flex-wrap items-end gap-2 border-b p-3">
           <Input name="q" defaultValue={sp.q} placeholder="Ticket no., entity ID or user name" className="min-w-56 flex-1" aria-label="Search" />

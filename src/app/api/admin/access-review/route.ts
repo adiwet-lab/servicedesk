@@ -12,7 +12,7 @@ export async function GET() {
     await enforceRateLimit(`access-review:${actor.id}`, 10, 60_000);
     const csv = await exportAccessReviewCsv(actor);
     const day = new Date().toISOString().slice(0, 10);
-    return new Response("﻿" + csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="access-review-${day}.csv"`, "Cache-Control": "no-store" } });
+    return new Response(csv, /* toCsv already starts with a BOM */ { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="access-review-${day}.csv"`, "Cache-Control": "no-store" } });
   } catch (e) {
     if (e instanceof AuthorizationError) return new Response("Forbidden", { status: 403 });
     if ((e as Error).name === "RateLimitError") return new Response("Too many exports", { status: 429 });
