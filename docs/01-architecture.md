@@ -87,3 +87,12 @@ Browser ──socket.io (same origin, session cookie)──▶ server.ts ── 
 - `src/server/integrations/`: `crypto.ts` (AES-GCM secrets, token hashing, pseudonyms) · `ssrf.ts` (outbound allow-list) · `http.ts` (timeouts, no redirects, size cap, Retry-After) · `outbox.ts` · `teams.ts` · `graph.ts` · `assets.ts` (AssetProvider: demo / REST) · `bi.ts`.
 - Job runner tick = SLA sweep → outbox delivery → due Graph syncs (each behind its own database lease). `pnpm jobs:run` runs all three once.
 - Power BI feeds are plain route handlers (`/api/bi/v1/[feed]`) authenticated by bearer token, excluded from the session middleware.
+
+## Production hardening (Phase 7)
+- **CSP**: nonce per request from `src/middleware.ts`; the root layout reads it (all routes dynamic) and passes it to `next-themes`.
+- **Rate limits**: `REDIS_URL` → shared limiter (Azure Cache for Redis, same instance as the Socket.IO adapter). Behind Front Door / App Gateway / Container Apps ingress set `TRUST_PROXY_HOPS=1` (one trusted hop) so per-IP limits use the real client address.
+- **Probes**: liveness `GET /api/health` (process), readiness `GET /api/ready` (PostgreSQL, Redis). Point the platform's readiness/startup probe at `/api/ready`.
+- **Secrets**: App Settings with Key Vault references for `AUTH_SECRET`, `AUTH_MICROSOFT_ENTRA_ID_SECRET`, `INTEGRATIONS_KEY`, `DATABASE_URL`.
+- **Managed identity (recommended next step)**: grant the app's identity *Storage Blob Data Contributor* on the attachment container and use Entra authentication for Azure Database for PostgreSQL; this needs a small storage-driver change (DefaultAzureCredential) and is not enabled yet.
+- **Malware scanning**: enable Defender for Storage *on-upload malware scanning* on the attachment account, set `STORAGE_DRIVER=azure` and *System Settings → Malware scanning = Defender*. The app reads the blob index tag `Malware Scanning scan result`.
+- **Audit retention**: schedule `pnpm audit:export --from … --to … --out …` (e.g. monthly Container Apps Job) and upload to a container with a time-based immutability policy.

@@ -1,12 +1,6 @@
-import { prisma } from "@/server/db";
-
 export const dynamic = "force-dynamic";
 
+/** Liveness: the process is up and serving. Dependencies are checked by /api/ready. */
 export async function GET() {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return Response.json({ status: "ok" });
-  } catch {
-    return Response.json({ status: "degraded" }, { status: 503 });
-  }
+  return Response.json({ status: "ok" }, { headers: { "Cache-Control": "no-store" } });
 }

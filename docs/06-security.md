@@ -41,12 +41,16 @@
 | 38 | Power BI token theft / over-exposure | Tokens random 256-bit, shown once, stored as SHA-256; expiry, revocation, scope check, 120 req/min; pseudonymous user keys (HMAC) by default; never descriptions/chat/notes; confidential subjects never exported; creation/revocation audited | `integrations/bi.ts` (tested) |
 | 39 | Directory sync side effects | App-only `User.Read.All`; match by (tenant, oid), email linking only inside the tenant (as sign-in); creates users only for auto-provisioning tenants; never re-activates; disabled accounts deactivated + sessions revoked; unknown departments reported, not created; per-tenant lease; summary audited | `integrations/graph.ts` (tested) |
 | 40 | Asset data exposure | Employees only see name/model/status of a tag (serial, holder, location for IT staff); lookups rate-limited; tag URL-encoded into a fixed path on the configured host | `actions/integrations.ts`, `integrations/assets.ts` (tested) |
+| 41 | Script injection (XSS escalation) | Per-request nonce CSP from middleware: `script-src 'self' 'nonce-…' 'strict-dynamic'`, no `'unsafe-inline'`/`'unsafe-eval'` for scripts in production; all routes dynamic so every response gets a fresh nonce; COOP/CORP `same-origin` | `middleware.ts`, `lib/csp.ts` (unit + E2E + prod smoke) |
+| 42 | Rate-limit bypass across replicas / IP spoofing | Redis fixed-window limiter shared by all instances (atomic Lua), degrading to per-instance memory if Redis is down; client IP = TCP peer stamped by the server, `X-Forwarded-For` only for `TRUST_PROXY_HOPS` trusted proxies (right-most trusted entry); per-IP limits on sign-in and Power BI (bad-token throttle) | `ratelimit.ts`, `net.ts`, `api/auth`, `api/bi` (tested incl. real Redis) |
+| 43 | Stale vendor / dormant accounts | Access review (expiring, expired-but-active, 90-day dormant, privileged holders, tokens) with audited CSV; automatic expiry notices to user and user admins once per window | `services/admin/access-review.ts` (tested) |
+| 44 | Audit retention vs tamper-proofing | Retention by export, never deletion: streaming CSV/NDJSON export (keyset paged, capped, audited) and `pnpm audit:export` for immutable storage; DB trigger keeps the log append-only | `services/admin/audit-export.ts` (tested) |
+| 45 | Malware in uploads | Optional Defender for Storage gate: uploads held (409) until tagged clean, malicious files never served (403), audited + notified | `storage/malware-scan.ts` (tested with simulated tags) |
+| 46 | Container breakout / tampering | Non-root user, read-only root FS + tmpfs, all capabilities dropped, `no-new-privileges`; liveness (`/api/health`) separate from readiness (`/api/ready`: DB + Redis) | `Dockerfile`, `docker-compose.yml` |
 | 21 | Dev backdoor in production | Dev login disabled when `NODE_ENV=production` regardless of flag (verified on the standalone build) | `auth.ts` |
 
 ## Hardening backlog
-- Nonce-based CSP (remove `'unsafe-inline'` for scripts) via middleware.
-- Redis-backed rate limiter + per-IP limits at Front Door WAF.
-- Antivirus scanning of uploads (Microsoft Defender for Storage) before download is allowed.
-- Managed identity for Blob/PostgreSQL instead of connection strings.
-- Periodic access review report for vendor accounts nearing expiry.
-- Audit log export/retention to Log Analytics (immutable storage).
+- Managed identity for Blob Storage / PostgreSQL instead of connection strings (see docs/01 — needs Azure-side configuration).
+- Removing `'unsafe-inline'` from **style-src** (requires replacing inline style attributes used by Radix/Tailwind utilities).
+- Tamper-evident audit hash chain in addition to the append-only trigger.
+- WAF rules (Front Door) in front of the per-IP application limits.
