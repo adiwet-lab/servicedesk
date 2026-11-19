@@ -19,6 +19,7 @@ export function portalNav(actor: Actor): NavSection[] {
   if (views.has("branch")) items.push({ label: "Branch Tickets", href: "/tickets/branch", icon: "building" });
   if (can(actor, P.TICKET_CREATE)) items.push({ label: "Create Ticket", href: "/tickets/new", icon: "plus" });
   if (views.has("my")) items.push({ label: "Messages", href: "/messages", icon: "chat", badge: "messages" });
+  items.push({ label: "Help Center", href: "/help", icon: "file" });
   items.push({ label: "Notifications", href: "/notifications", icon: "bell" }, { label: "Profile", href: "/profile", icon: "user" });
   return [{ items }];
 }
@@ -47,6 +48,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Overdue Tickets", href: "/admin/tickets?view=overdue", icon: "clock", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
         { label: "SLA Breached", href: "/admin/tickets?view=breached", icon: "flag", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
         { label: "Major Incidents", href: "/admin/incidents", icon: "alert", perm: [P.INCIDENT_MANAGE, P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL] },
+        { label: "Knowledge Base", href: "/admin/kb", icon: "file", perm: [P.KB_WRITE, P.KB_PUBLISH] },
         { label: "Support Chat", href: "/admin/chat", icon: "chat", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL], badge: "messages" },
       ],
     },

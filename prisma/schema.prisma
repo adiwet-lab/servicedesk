@@ -97,6 +97,23 @@ enum MajorIncidentStatus {
   RESOLVED
 }
 
+enum KbArticleType {
+  FAQ
+  TROUBLESHOOTING
+  HOW_TO
+}
+
+enum KbVisibility {
+  EMPLOYEES
+  SUPPORT_ONLY
+}
+
+enum KbStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum ImpactScope {
   SINGLE_USER
   SINGLE_BRANCH
@@ -245,6 +262,9 @@ model User {
   routingRules         RoutingRule[]
   majorDeclared        Ticket[]           @relation("MajorDeclaredBy")
   incidentUpdates      IncidentUpdate[]
+  kbAuthored           KbArticle[]        @relation("KbAuthor")
+  kbEdited             KbArticle[]        @relation("KbEditor")
+  kbFeedback           KbFeedback[]
 
   @@unique([tenantId, entraObjectId])
   @@index([email])
@@ -393,6 +413,7 @@ model Category {
   mainTickets       Ticket[]       @relation("TicketCategory")
   subTickets        Ticket[]       @relation("TicketSubcategory")
   routingRules      RoutingRule[]
+  kbArticles        KbArticle[]
 
   @@index([parentId])
 }
@@ -522,6 +543,8 @@ model Ticket {
   impactedUserCount   Int?
   impactedBranches    TicketImpactedBranch[]
   incidentUpdates     IncidentUpdate[]
+  kbArticlesFromThis  KbArticle[]            @relation("KbSource")
+  kbLinks             KbArticleTicket[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
   deletedAt           DateTime?
@@ -897,4 +920,65 @@ model IncidentUpdate {
   createdAt DateTime            @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+// ───────────────────────────── Knowledge base (Phase 6B) ─────────────────────────────
+
+model KbArticle {
+  id             String            @id @default(cuid())
+  number         String            @unique
+  title          String
+  summary        String            @default("")
+  /// Markdown subset — rendered server-side with full HTML escaping.
+  body           String
+  type           KbArticleType     @default(FAQ)
+  visibility     KbVisibility      @default(EMPLOYEES)
+  status         KbStatus          @default(DRAFT)
+  categoryId     String?
+  category       Category?         @relation(fields: [categoryId], references: [id])
+  tags           String[]          @default([])
+  authorId       String
+  author         User              @relation("KbAuthor", fields: [authorId], references: [id])
+  updatedById    String?
+  updatedBy      User?             @relation("KbEditor", fields: [updatedById], references: [id])
+  sourceTicketId String?
+  sourceTicket   Ticket?           @relation("KbSource", fields: [sourceTicketId], references: [id])
+  viewCount      Int               @default(0)
+  helpfulYes     Int               @default(0)
+  helpfulNo      Int               @default(0)
+  version        Int               @default(1)
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  tickets        KbArticleTicket[]
+  feedback       KbFeedback[]
+
+  @@index([status, visibility])
+  @@index([categoryId])
+}
+
+/// Tickets related to an article (source ticket, tickets solved with it).
+model KbArticleTicket {
+  articleId  String
+  article    KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  ticketId   String
+  ticket     Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  linkedById String?
+  createdAt  DateTime  @default(now())
+
+  @@id([articleId, ticketId])
+  @@index([ticketId])
+}
+
+model KbFeedback {
+  articleId String
+  article   KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  helpful   Boolean
+  comment   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@id([articleId, userId])
 }

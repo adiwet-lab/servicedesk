@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  esbuild: { jsx: "automatic" },
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   test: {
     environment: "node",
@@ -11,7 +12,7 @@ export default defineConfig({
     fileParallelism: false,
     env: { STORAGE_DRIVER: "local", STORAGE_LOCAL_DIR: "./.test-storage" },
     projects: [
-      { extends: true, test: { name: "unit", include: ["tests/unit/**/*.test.ts"] } },
+      { extends: true, test: { name: "unit", include: ["tests/unit/**/*.test.{ts,tsx}"] } },
       {
         extends: true,
         test: {

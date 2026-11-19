@@ -9,4 +9,7 @@ export async function loginAs(page: Page, displayName: string) {
   await select.selectOption({ label });
   await page.getByTestId("dev-login-submit").click();
   await expect(page).not.toHaveURL(/\/login/);
+  // On a cold dev server the first page compile can trigger a Fast Refresh reload that would
+  // abort the test's next navigation; let the landing page settle first.
+  await page.waitForLoadState("networkidle").catch(() => undefined);
 }

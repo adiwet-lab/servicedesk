@@ -25,6 +25,8 @@ import { formatAging, formatBytes, formatDateTime } from "@/lib/utils";
 import { PriorityBadge, StatusBadge } from "./badges";
 import { SlaCard } from "./sla-card";
 import { IncidentPanel } from "@/components/incidents/incident-panel";
+import { CreateFromTicketButton } from "@/components/kb/kb-client";
+import { canWriteKb, relatedArticlesForTicket } from "@/server/services/kb";
 import { AssignDialog, AttachmentUploader, StatusChanger } from "./ticket-actions";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -61,6 +63,9 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
       ])
     : [[], []];
   const closed = ["CLOSED", "CANCELLED"].includes(t.status.kind);
+  const related = await relatedArticlesForTicket(actor, t.id);
+  const kbBase = backHref.startsWith("/admin") && canWriteKb(actor) ? "/admin/kb" : "/help";
+  const canDraftKb = canWriteKb(actor) && perm.canWork && ["RESOLVED", "CLOSED"].includes(t.status.kind) && !t.isConfidential;
 
   return (
     <div className="space-y-5">
@@ -179,6 +184,22 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
             supporting={t.supportingTeams.map((s) => s.team)} openTasksByTeam={detail.openTasksByTeam} canManage={perm.canManageSupportingTeams}
             teams={editOptions?.teams ?? []} />
           <IncidentPanel actor={actor} ticketId={t.id} ticketBase={backHref} />
+          {(related.length > 0 || canDraftKb) && (
+            <Card data-testid="kb-related">
+              <CardHeader><CardTitle className="text-base">Knowledge articles</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {related.length > 0 && (
+                  <ul className="space-y-1">
+                    {related.map((a) => (
+                      <li key={a.id}><Link className="text-primary hover:underline" href={`${a.status === "PUBLISHED" ? kbBase : "/admin/kb"}/${a.number}`}>{a.title}</Link>
+                        {a.linked && <span className="ml-1 text-xs text-muted-foreground">(from this ticket)</span>}</li>
+                    ))}
+                  </ul>
+                )}
+                {canDraftKb && <CreateFromTicketButton ticketId={t.id} />}
+              </CardContent>
+            </Card>
+          )}
           <SlaCard ticketId={t.id} />
           <Card>
             <CardHeader><CardTitle className="text-base">Requester</CardTitle></CardHeader>

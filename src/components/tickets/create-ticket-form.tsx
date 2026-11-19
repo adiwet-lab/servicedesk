@@ -7,6 +7,7 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Alert, Field } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ImpactFields } from "@/components/incidents/incident-forms";
+import { SuggestedArticles } from "@/components/kb/kb-client";
 
 interface Cat { id: string; name: string; requiredFields: string[]; defaultPriorityId: string | null }
 interface Props {
@@ -26,6 +27,7 @@ export function CreateTicketForm(p: Props) {
   const [subId, setSubId] = useState("");
   const [branchId, setBranchId] = useState(p.defaults.branchId ?? "");
   const [files, setFiles] = useState<File[]>([]);
+  const [subject, setSubject] = useState("");
   const cat = p.categories.find((c) => c.id === catId);
   const sub = cat?.children.find((s) => s.id === subId);
   const required = useMemo(() => new Set([...(cat?.requiredFields ?? []), ...(sub?.requiredFields ?? [])]), [cat, sub]);
@@ -57,7 +59,7 @@ export function CreateTicketForm(p: Props) {
               </NativeSelect>
             </Field>
             <Field label="Subject" htmlFor="subject" required error={fe.subject} className="sm:col-span-2">
-              <Input id="subject" name="subject" maxLength={200} placeholder="Short summary, e.g. “POS terminal 3 cannot print receipts”" aria-invalid={!!fe.subject} required />
+              <Input id="subject" name="subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={200} placeholder="Short summary, e.g. “POS terminal 3 cannot print receipts”" aria-invalid={!!fe.subject} required />
             </Field>
             <Field label="Description" htmlFor="description" required error={fe.description} className="sm:col-span-2" hint="Include what happened, when it started, error messages and what you already tried.">
               <Textarea id="description" name="description" rows={7} maxLength={20000} aria-invalid={!!fe.description} required />
@@ -65,6 +67,7 @@ export function CreateTicketForm(p: Props) {
           </CardContent>
         </Card>
 
+        <SuggestedArticles text={subject} categoryId={subId || catId} />
         <Card>
           <CardHeader>
             <CardTitle>Details</CardTitle>

@@ -284,6 +284,7 @@ async function main() {
   console.log("Seeding sequences & settings…");
   await prisma.numberSequence.upsert({ where: { key: "TICKET" }, update: {}, create: { key: "TICKET", prefix: "IT", format: "{PREFIX}-{YYYY}-{SEQ:6}", year: new Date().getFullYear() } });
   await prisma.numberSequence.upsert({ where: { key: "TASK" }, update: {}, create: { key: "TASK", prefix: "TSK", format: "{PREFIX}-{YYYY}-{SEQ:6}", year: new Date().getFullYear() } });
+  await prisma.numberSequence.upsert({ where: { key: "KB" }, update: {}, create: { key: "KB", prefix: "KB", format: "{PREFIX}-{SEQ:6}", resetYearly: false, year: new Date().getFullYear() } });
   const settings: Record<string, unknown> = {
     "attachments.maxFileSizeMb": 10,
     "attachments.maxFilesPerUpload": 5,
@@ -302,7 +303,55 @@ async function main() {
     await prisma.ticketTag.upsert({ where: { name }, update: {}, create: { name } });
   }
 
+  await seedKnowledgeBase();
+
   console.log("✅ Seed complete.");
+}
+
+/** Starter knowledge articles (idempotent by title). Numbers come from the KB sequence. */
+async function seedKnowledgeBase() {
+  console.log("Seeding knowledge base…");
+  const author = await prisma.user.findFirst({ where: { email: "sys.admin@contoso.example" } });
+  if (!author) return;
+  const cat = async (code: string) => (await prisma.category.findUnique({ where: { code } }))?.id ?? null;
+  const articles: { title: string; summary: string; body: string; type: "FAQ" | "TROUBLESHOOTING" | "HOW_TO"; visibility: "EMPLOYEES" | "SUPPORT_ONLY"; status: "DRAFT" | "PUBLISHED"; category: string; tags: string[] }[] = [
+    {
+      title: "How to connect to the company VPN", summary: "Install the VPN client and sign in with your Microsoft account to work from outside the office.",
+      type: "HOW_TO", visibility: "EMPLOYEES", status: "PUBLISHED", category: "NW-VPN", tags: ["vpn", "remote"],
+      body: "## Before you start\n\n- You need a company laptop.\n- You need an internet connection.\n\n## Steps\n\n1. Open **Company Portal** and install *Contoso VPN*.\n2. Start the VPN client and choose **Sign in with Microsoft**.\n3. Approve the sign-in in the Authenticator app.\n\n> If the client shows `Error 809`, your home router blocks VPN traffic — try a mobile hotspot.",
+    },
+    {
+      title: "Printer shows Offline", summary: "Quick checks when a shared printer shows as offline on your computer.",
+      type: "TROUBLESHOOTING", visibility: "EMPLOYEES", status: "PUBLISHED", category: "HW-PR", tags: ["printer"],
+      body: "## Symptoms\n\nThe printer is listed as *Offline* and jobs stay in the queue.\n\n## Solution\n\n1. Check the printer display for paper jams or errors.\n2. On your computer open **Settings › Printers**, select the printer and choose **Use printer online**.\n3. Delete stuck jobs and print again.\n\nIf other people are also affected, create a ticket and mention the printer name on the label.",
+    },
+    {
+      title: "How do I reset my password? (วิธีรีเซ็ตรหัสผ่าน)", summary: "Reset your Microsoft 365 password yourself — รีเซ็ตรหัสผ่านด้วยตัวเอง",
+      type: "FAQ", visibility: "EMPLOYEES", status: "PUBLISHED", category: "M365", tags: ["password", "account"],
+      body: "Go to [the password reset page](https://passwordreset.microsoftonline.com/) and follow the steps. You need your registered mobile number.\n\nวิธีรีเซ็ตรหัสผ่าน: เปิดหน้ารีเซ็ตรหัสผ่าน แล้วทำตามขั้นตอน",
+    },
+    {
+      title: "POS terminal frozen: safe restart procedure", summary: "Store-side restart sequence for frozen POS terminals (support staff).",
+      type: "TROUBLESHOOTING", visibility: "SUPPORT_ONLY", status: "PUBLISHED", category: "RTL-POS", tags: ["pos", "retail"],
+      body: "## Steps\n\n1. Ask the cashier to finish or void the open transaction.\n2. Hold the power button for 10 seconds.\n3. After restart, check the payment terminal pairing under **Settings › Devices**.\n\nEscalate to Retail Systems if the terminal does not reconnect within 5 minutes.",
+    },
+    {
+      title: "Guest Wi-Fi access for visitors", summary: "Draft — how reception requests guest Wi-Fi vouchers.",
+      type: "HOW_TO", visibility: "EMPLOYEES", status: "DRAFT", category: "NW-WIFI", tags: ["wifi"],
+      body: "Reception can request daily guest vouchers through an IT Request ticket. (Draft — process still being agreed.)",
+    },
+  ];
+  for (const a of articles) {
+    if (await prisma.kbArticle.findFirst({ where: { title: a.title } })) continue;
+    const number = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ prefix: string; current: number }[]>`UPDATE "NumberSequence" SET "current" = "current" + 1, "updatedAt" = NOW() WHERE "key" = 'KB' RETURNING "prefix", "current"`;
+      return `${rows[0]!.prefix}-${String(rows[0]!.current).padStart(6, "0")}`;
+    });
+    await prisma.kbArticle.create({
+      data: { number, title: a.title, summary: a.summary, body: a.body, type: a.type, visibility: a.visibility, status: a.status,
+        categoryId: await cat(a.category), tags: a.tags, authorId: author.id, publishedAt: a.status === "PUBLISHED" ? new Date() : null },
+    });
+  }
 }
 
 main()
