@@ -1,0 +1,58 @@
+# Local full stack:  docker compose up --build
+# With Azurite (Azure Blob emulator):  docker compose --profile azurite up --build  (and set STORAGE_DRIVER=azure)
+name: servicedesk
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: servicedesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-servicedesk}
+      POSTGRES_DB: servicedesk
+    ports: ["5432:5432"]
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U servicedesk"]
+      interval: 5s
+      retries: 10
+
+  migrate:
+    build: { context: ., target: migrator }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      DATABASE_URL: postgresql://servicedesk:${POSTGRES_PASSWORD:-servicedesk}@db:5432/servicedesk?schema=public
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  app:
+    build: { context: ., target: runner }
+    ports: ["3000:3000"]
+    env_file: [.env.docker]
+    environment:
+      DATABASE_URL: postgresql://servicedesk:${POSTGRES_PASSWORD:-servicedesk}@db:5432/servicedesk?schema=public
+    volumes: [attachments:/app/storage]
+    # Hardening: immutable root filesystem, no Linux capabilities, no privilege escalation.
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    profiles: ["azurite"]
+    command: azurite-blob --blobHost 0.0.0.0 --loose
+    ports: ["10000:10000"]
+
+volumes:
+  db-data:
+  attachments:
