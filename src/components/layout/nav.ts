@@ -46,6 +46,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Assigned to Me", href: "/admin/tickets?view=assigned", icon: "user", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
         { label: "Overdue Tickets", href: "/admin/tickets?view=overdue", icon: "clock", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
         { label: "SLA Breached", href: "/admin/tickets?view=breached", icon: "flag", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
+        { label: "Major Incidents", href: "/admin/incidents", icon: "alert", perm: [P.INCIDENT_MANAGE, P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL] },
         { label: "Support Chat", href: "/admin/chat", icon: "chat", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL], badge: "messages" },
       ],
     },

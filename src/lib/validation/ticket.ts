@@ -29,6 +29,8 @@ export const createTicketSchema = z.object({
   affectedSystem: optText(200),
   affectedUsers: optText(500),
   isConfidential: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()).default(false),
+  impactScope: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.enum(["SINGLE_USER", "SINGLE_BRANCH", "MULTIPLE_BRANCHES", "COMPANY_WIDE", "MULTIPLE_COMPANIES"]).optional()),
+  impactBranchIds: z.preprocess((v) => (v == null ? [] : Array.isArray(v) ? v : [v]), z.array(z.string().min(1).max(50)).max(500)).default([]),
 });
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 

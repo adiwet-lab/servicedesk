@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { KpiCard } from "@/components/dashboard/kpi";
 import { TicketTable } from "@/components/tickets/ticket-table";
+import { KnownIssuesBanner } from "@/components/incidents/known-issues";
 
 export const metadata = { title: "Dashboard" };
 
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
         description="Track your IT requests and incidents."
         actions={can(actor, P.TICKET_CREATE) && <Button asChild><Link href="/tickets/new"><PlusCircle /> Create ticket</Link></Button>}
       />
+      <div className="mb-5"><KnownIssuesBanner actor={actor} /></div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         <KpiCard label="Total My Tickets" value={summary.total} href="/tickets" color="#3b82f6" />
         {summary.statuses.map((s) => (

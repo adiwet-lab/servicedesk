@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { formatAging, formatBytes, formatDateTime } from "@/lib/utils";
 import { PriorityBadge, StatusBadge } from "./badges";
 import { SlaCard } from "./sla-card";
+import { IncidentPanel } from "@/components/incidents/incident-panel";
 import { AssignDialog, AttachmentUploader, StatusChanger } from "./ticket-actions";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -71,6 +72,7 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
             <StatusBadge status={t.status} />
             <PriorityBadge priority={t.priority} />
             {t.isConfidential && <Badge variant="warning"><Lock className="size-3" /> Confidential</Badge>}
+            {t.isMajorIncident && <Badge variant="destructive" data-testid="major-badge">Major incident</Badge>}
           </div>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">{t.subject}</h1>
           <p className="text-sm text-muted-foreground">Opened {formatDateTime(t.createdAt)} by {t.createdBy.displayName} · aging {formatAging(t.createdAt, t.closedAt ?? t.resolvedAt ?? new Date())}</p>
@@ -176,6 +178,7 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
           <TeamsCard ticketId={t.id} owner={t.ownerTeam ? { id: t.ownerTeam.id, name: t.ownerTeam.name } : null} agent={t.assignedAgent?.displayName ?? null}
             supporting={t.supportingTeams.map((s) => s.team)} openTasksByTeam={detail.openTasksByTeam} canManage={perm.canManageSupportingTeams}
             teams={editOptions?.teams ?? []} />
+          <IncidentPanel actor={actor} ticketId={t.id} ticketBase={backHref} />
           <SlaCard ticketId={t.id} />
           <Card>
             <CardHeader><CardTitle className="text-base">Requester</CardTitle></CardHeader>

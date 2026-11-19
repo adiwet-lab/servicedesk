@@ -14,7 +14,7 @@ export async function createTicketAction(_prev: ActionResult<{ number: string }>
   const result = await runAction(async () => {
     const actor = await requireActorOrThrow();
     const files = await filesFromForm(fd);
-    const t = await createTicket(actor, formToObject(fd), files);
+    const t = await createTicket(actor, formToObject(fd, ["impactBranchIds"]), files);
     return { number: t.number };
   });
   if (result.ok && result.data) redirect(`/tickets/${result.data.number}?created=1`);

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Alert, Field } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ImpactFields } from "@/components/incidents/incident-forms";
 
 interface Cat { id: string; name: string; requiredFields: string[]; defaultPriorityId: string | null }
 interface Props {
@@ -109,6 +110,10 @@ export function CreateTicketForm(p: Props) {
               <input id="attachments" name="attachments" type="file" multiple className="sr-only" accept={p.allowedExtensions.map((e) => `.${e}`).join(",")}
                 onChange={(e) => setFiles(Array.from(e.target.files ?? []))} required={required.has("attachments")} />
             </Field>
+            <div className="sm:col-span-2">
+              <ImpactFields branches={p.branches} branchField="impactBranchIds" optional />
+              {fe.impactScope && <p className="mt-1 text-sm text-destructive">{fe.impactScope}</p>}
+            </div>
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input type="checkbox" name="isConfidential" className="size-4 accent-primary" />
               Confidential — only me, the assigned agent and the owning support team can see this ticket

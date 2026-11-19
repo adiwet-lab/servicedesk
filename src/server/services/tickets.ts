@@ -25,6 +25,7 @@ import { nextNumber } from "./numbering";
 import { notifyUsers, teamMemberIds } from "./notifications";
 import { getSettings } from "./settings";
 import { applyStatusChange, computeSlaTargets, recordFirstResponse, startClocks } from "./sla";
+import { normaliseCreateImpact, validateImpact } from "@/server/domain/impact";
 
 // ───────────────────────────── Listing ─────────────────────────────
 
@@ -342,6 +343,15 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
     locationId = l.id;
   }
 
+  // Branch impact (optional)
+  const impact = normaliseCreateImpact(input.impactScope, input.impactBranchIds, branchId);
+  if (impact) {
+    const err = validateImpact(impact);
+    if (err) throw new ValidationError(err, { impactScope: err });
+    if (impact.branchIds.length && (await prisma.branch.count({ where: { id: { in: impact.branchIds }, deletedAt: null } })) !== impact.branchIds.length)
+      throw new ValidationError("Unknown impacted branch.", { impactScope: "Unknown impacted branch" });
+  }
+
   const defaultStatus = await prisma.ticketStatus.findFirst({ where: { isDefault: true, isActive: true } })
     ?? (await prisma.ticketStatus.findFirst({ where: { kind: "NEW", isActive: true }, orderBy: { order: "asc" } }));
   if (!defaultStatus) throw new Error("No initial ticket status configured.");
@@ -406,6 +416,8 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
           affectedSystem: input.affectedSystem,
           affectedUsers: input.affectedUsers,
           isConfidential: input.isConfidential,
+          impactScope: impact?.impactScope ?? null,
+          impactedBranches: impact?.branchIds.length ? { create: impact.branchIds.map((id) => ({ branchId: id })) } : undefined,
           ownerTeamId: routing.teamId,
           assignedAgentId: routing.agentId,
           ...sla,

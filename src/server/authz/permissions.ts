@@ -27,6 +27,11 @@ export const PERMISSIONS = {
   DASHBOARD_SUPPORT: "dashboard.support",
   DASHBOARD_MANAGEMENT: "dashboard.management",
   REPORT_EXPORT: "report.export",
+  // Phase 6
+  INCIDENT_MANAGE: "incident.manage",
+  KB_WRITE: "kb.write",
+  KB_PUBLISH: "kb.publish",
+  INTEGRATIONS_MANAGE: "integrations.manage",
   // Administration
   ADMIN_CATEGORIES: "admin.categories",
   ADMIN_WORKFLOW: "admin.workflow",
@@ -61,6 +66,10 @@ export const PERMISSION_META: Record<PermissionCode, { group: string; descriptio
   "dashboard.support": { group: "Dashboards", description: "Support / team dashboards and admin portal access" },
   "dashboard.management": { group: "Dashboards", description: "Management dashboards across all tickets" },
   "report.export": { group: "Dashboards", description: "Run reports and export CSV (within own data scope)" },
+  "incident.manage": { group: "Tickets", description: "Declare and manage major incidents (updates, linking, resolution)" },
+  "kb.write": { group: "Knowledge Base", description: "Create and edit knowledge articles (drafts)" },
+  "kb.publish": { group: "Knowledge Base", description: "Publish and archive knowledge articles" },
+  "integrations.manage": { group: "Administration", description: "Manage integrations (Microsoft Graph, Teams, assets, Power BI tokens)" },
   "admin.categories": { group: "Administration", description: "Manage categories, priorities and routing" },
   "admin.workflow": { group: "Administration", description: "Manage statuses and workflow transitions" },
   "admin.sla": { group: "Administration", description: "Manage SLA, business hours, holidays" },
@@ -89,7 +98,7 @@ export type RoleCode = (typeof ROLE_CODES)[keyof typeof ROLE_CODES];
 const P = PERMISSIONS;
 const SUPPORT_BASE: PermissionCode[] = [
   P.TICKET_CREATE, P.TICKET_READ_OWN, P.TICKET_READ_TEAM, P.TICKET_UPDATE, P.TICKET_ASSIGN,
-  P.NOTE_INTERNAL_READ, P.NOTE_INTERNAL_WRITE, P.TASK_READ, P.TASK_MANAGE, P.DASHBOARD_SUPPORT,
+  P.NOTE_INTERNAL_READ, P.NOTE_INTERNAL_WRITE, P.TASK_READ, P.TASK_MANAGE, P.DASHBOARD_SUPPORT, P.KB_WRITE,
 ];
 
 /** Default role → permissions mapping used by the seed. */
@@ -107,7 +116,7 @@ export const DEFAULT_ROLE_MATRIX: Record<RoleCode, { name: string; description: 
   TEAM_LEAD: {
     name: "Support Team Lead",
     description: "Manages team queue, assignment, transfer and escalation",
-    permissions: [...SUPPORT_BASE, P.TICKET_TRANSFER, P.TICKET_ESCALATE, P.TASK_ASSIGN, P.REPORT_EXPORT],
+    permissions: [...SUPPORT_BASE, P.TICKET_TRANSFER, P.TICKET_ESCALATE, P.TASK_ASSIGN, P.REPORT_EXPORT, P.INCIDENT_MANAGE, P.KB_PUBLISH],
   },
   SYSTEM_ADMIN: {
     name: "System Admin",
@@ -143,11 +152,12 @@ export const VENDOR_FORBIDDEN_PERMISSIONS: PermissionCode[] = [
   P.DASHBOARD_MANAGEMENT,
   P.ADMIN_CATEGORIES, P.ADMIN_WORKFLOW, P.ADMIN_SLA, P.ADMIN_ORG, P.ADMIN_TEAMS,
   P.ADMIN_USERS, P.ADMIN_ROLES, P.ADMIN_TENANTS, P.ADMIN_SETTINGS, P.AUDIT_READ,
+  P.INCIDENT_MANAGE, P.KB_WRITE, P.KB_PUBLISH, P.INTEGRATIONS_MANAGE,
 ];
 
 /** Any of these grants entry into the /admin portal. */
 export const ADMIN_PORTAL_PERMISSIONS: PermissionCode[] = [
   P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL, P.REPORT_EXPORT,
   P.ADMIN_CATEGORIES, P.ADMIN_WORKFLOW, P.ADMIN_SLA, P.ADMIN_ORG, P.ADMIN_TEAMS,
-  P.ADMIN_USERS, P.ADMIN_ROLES, P.ADMIN_TENANTS, P.ADMIN_SETTINGS, P.AUDIT_READ,
+  P.ADMIN_USERS, P.ADMIN_ROLES, P.ADMIN_TENANTS, P.ADMIN_SETTINGS, P.AUDIT_READ, P.INTEGRATIONS_MANAGE, P.INCIDENT_MANAGE,
 ];

@@ -20,9 +20,10 @@ export const NOTIFICATION_TYPES = {
   TASK_CREATED: "Task created",
   TASK_ASSIGNED: "Task assigned",
   TASK_UPDATED: "Task updated",
-  TASK_OVERDUE: "Task overdue (Phase 4)",
-  SLA_WARNING: "SLA warning (Phase 4)",
-  SLA_BREACHED: "SLA breached (Phase 4)",
+  TASK_OVERDUE: "Task overdue",
+  SLA_WARNING: "SLA warning",
+  SLA_BREACHED: "SLA breached",
+  MAJOR_INCIDENT: "Major incident declared / updated / resolved",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 
