@@ -26,6 +26,7 @@ export const NOTIFICATION_TYPES = {
   MAJOR_INCIDENT: "Major incident declared / updated / resolved",
   APPROVAL_REQUESTED: "Approval requested from me",
   APPROVAL_DECIDED: "Approval decision on my ticket",
+  ACCESS_EXPIRING: "Account access expiring (vendors / time-limited users)",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 

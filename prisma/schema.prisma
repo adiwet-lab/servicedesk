@@ -263,6 +263,8 @@ model User {
   reports          User[]           @relation("UserManager")
   status           UserStatus       @default(ACTIVE)
   accessExpiresAt  DateTime?
+  /// Last time an access-expiry notice was sent (once per expiry window).
+  expiryNotifiedAt DateTime?
   ticketVisibility TicketVisibility @default(OWN)
   sessionVersion   Int              @default(1)
   lastLoginAt      DateTime?

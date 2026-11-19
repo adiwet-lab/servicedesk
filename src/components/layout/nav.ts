@@ -106,6 +106,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Notification Settings", href: "/admin/system/notifications", icon: "bell", perm: P.ADMIN_SETTINGS },
         { label: "Integrations", href: "/admin/integrations", icon: "external", perm: P.INTEGRATIONS_MANAGE },
         { label: "Audit Logs", href: "/admin/system/audit", icon: "file", perm: P.AUDIT_READ },
+        { label: "Access Review", href: "/admin/system/access-review", icon: "shield", perm: P.ADMIN_USERS },
         { label: "System Settings", href: "/admin/system/settings", icon: "settings", perm: P.ADMIN_SETTINGS },
       ],
     },

@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { processOutbox } from "@/server/integrations/outbox";
 import { runDueGraphSyncs } from "@/server/integrations/graph";
 import { getSetting } from "@/server/services/settings";
+import { runExpiryNotices } from "@/server/services/admin/access-review";
 
 /**
  * In-process job runner (started by server.ts). Multiple instances are safe:
@@ -15,6 +16,7 @@ export function startJobRunner(opts: { intervalSeconds?: number; log?: (msg: str
   const log = opts.log ?? ((m: string) => console.log(m));
   let running = false;
   let lastGraphCheck = 0;
+  let lastExpiryCheck = 0;
   const tick = async () => {
     if (running) return;
     running = true;
@@ -32,6 +34,16 @@ export function startJobRunner(opts: { intervalSeconds?: number; log?: (msg: str
       if (!o.skipped && o.sent + o.failed + o.dead > 0) log(`[jobs] outbox: ${o.sent} sent, ${o.failed} retrying, ${o.dead} dead`);
     } catch (e) {
       console.error("[jobs] outbox failed", e);
+    }
+    // Access-expiry notices: hourly check, each user notified once per expiry window.
+    if (Date.now() - lastExpiryCheck > 60 * 60_000) {
+      lastExpiryCheck = Date.now();
+      try {
+        const x = await runExpiryNotices();
+        if (x.notified) log(`[jobs] access expiry: ${x.notified} notice(s)`);
+      } catch (e) {
+        console.error("[jobs] access expiry failed", e);
+      }
     }
     // Directory sync: checked at most every 10 minutes; each tenant syncs per its interval.
     if (Date.now() - lastGraphCheck > 10 * 60_000) {

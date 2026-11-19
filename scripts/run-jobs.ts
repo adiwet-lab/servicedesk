@@ -4,12 +4,14 @@ import { runSlaSweep } from "@/server/jobs/sla-sweep";
 import { processOutbox } from "@/server/integrations/outbox";
 import { runDueGraphSyncs } from "@/server/integrations/graph";
 import { getSetting } from "@/server/services/settings";
+import { runExpiryNotices } from "@/server/services/admin/access-review";
 
 async function main() {
   const sla = await runSlaSweep();
   const outbox = await processOutbox();
   const graph = await runDueGraphSyncs(await getSetting(prisma, "integrations.graph.syncIntervalHours"));
-  console.log(JSON.stringify({ sla, outbox, graph }));
+  const accessExpiry = await runExpiryNotices();
+  console.log(JSON.stringify({ sla, outbox, graph, accessExpiry }));
   process.exitCode = sla.errors > 0 ? 1 : 0;
 }
 
