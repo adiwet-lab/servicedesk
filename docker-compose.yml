@@ -1,0 +1,45 @@
+# Local full stack:  docker compose up --build
+# With Azurite (Azure Blob emulator):  docker compose --profile azurite up --build  (and set STORAGE_DRIVER=azure)
+name: servicedesk
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: servicedesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-servicedesk}
+      POSTGRES_DB: servicedesk
+    ports: ["5432:5432"]
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U servicedesk"]
+      interval: 5s
+      retries: 10
+
+  migrate:
+    build: { context: ., target: migrator }
+    environment:
+      DATABASE_URL: postgresql://servicedesk:${POSTGRES_PASSWORD:-servicedesk}@db:5432/servicedesk?schema=public
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  app:
+    build: { context: ., target: runner }
+    ports: ["3000:3000"]
+    env_file: [.env.docker]
+    environment:
+      DATABASE_URL: postgresql://servicedesk:${POSTGRES_PASSWORD:-servicedesk}@db:5432/servicedesk?schema=public
+    volumes: [attachments:/app/storage]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    profiles: ["azurite"]
+    command: azurite-blob --blobHost 0.0.0.0 --loose
+    ports: ["10000:10000"]
+
+volumes:
+  db-data:
+  attachments:
