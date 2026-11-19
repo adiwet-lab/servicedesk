@@ -61,6 +61,14 @@ Authorization = **permission** (what) × **data scope** (which rows). Both are e
 | Requester actions | only transitions flagged *requester allowed* (cancel, close resolved, reopen within window) |
 | Closed/Cancelled tickets | read-only unless `ticket.closed.edit` |
 | Grant roles / permissions | admin may only grant roles/permissions they hold (no privilege escalation); cannot remove own roles or deactivate self |
+| Create task | `task.manage` + can work the ticket |
+| Work a task (fields/status) | `task.manage` + task team member / task assignee / owner-team staff / admin |
+| Assign task to others / move team | `task.assign` + can work the ticket or leads the task's team (internal only); otherwise self-assign within own team |
+| Reopen task, change required flag | owner side only (never vendors / other task teams) |
+| Edit ticket fields | can work the ticket (internal only) |
+| Escalate | `ticket.escalate` + can work the ticket (internal only) |
+| Supporting teams add/remove | same as assign (`ticket.assign` within owner team, or read.all) |
+| Task visibility | parent ticket visible; vendors only their own team's / own tasks |
 | Internal notes (Phase 3) | `note.internal.read/write`, never for vendor tenants; filtered in the query (`messageScopeWhere`) |
 
 ## Role intent

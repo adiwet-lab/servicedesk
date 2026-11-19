@@ -6,6 +6,7 @@
 import { PrismaClient } from "@prisma/client";
 import { loadActor } from "../src/server/auth/load-actor";
 import { assignTicket, changeTicketStatus, createTicket } from "../src/server/services/tickets";
+import { assignTask, changeTaskStatus, createTask } from "../src/server/services/tasks";
 
 const prisma = new PrismaClient();
 
@@ -29,7 +30,7 @@ const SAMPLES: [string, string, string, string, Partial<Record<string, string>>?
 async function actorFor(key: string) {
   const emails: Record<string, string> = {
     emp1: "emma@contoso.example", emp2: "ethan@contoso.example", store: "somchai@contoso.example", fab: "fiona@fabrikam.example",
-    viewer: "mia.manager@contoso.example", agent: "ana.agent@contoso.example", lead: "lee.lead@contoso.example",
+    viewer: "mia.manager@contoso.example", agent: "ana.agent@contoso.example", lead: "lee.lead@contoso.example", erp: "erin.erp@contoso.example",
     retail: "rita.retail@contoso.example", infra: "ivan.infra@contoso.example", vendorA: "victor@vendor-a.example",
   };
   const u = await prisma.user.findFirstOrThrow({ where: { email: emails[key] } });
@@ -40,9 +41,43 @@ async function actorFor(key: string) {
 
 async function main() {
   if ((await prisma.ticket.count()) > 0) {
-    console.log("Tickets already exist — skipping demo data.");
-    return;
+    console.log("Tickets already exist — skipping demo tickets.");
+  } else {
+    await demoTickets();
   }
+  if ((await prisma.ticketTask.count()) > 0) {
+    console.log("Tasks already exist — skipping multi-team demo.");
+  } else {
+    await demoMultiTeam();
+  }
+}
+
+/** Phase 2 demo — the specification's multi-team example. */
+async function demoMultiTeam() {
+  const store = await actorFor("store");
+  const retail = await actorFor("retail");
+  const team = async (code: string) => (await prisma.supportTeam.findUniqueOrThrow({ where: { code } })).id;
+  const cat = async (code: string) => (await prisma.category.findUniqueOrThrow({ where: { code } })).id;
+  const t = await createTicket(store, {
+    subject: "Branch POS cannot operate", description: "All POS terminals at Siam store show 'Offline' and cannot take payments since opening.",
+    categoryId: await cat("RTL"), subcategoryId: await cat("RTL-POS"), relatedAsset: "POS-BKK01-ALL", contactNumber: "+66 81 234 5678",
+    affectedUsers: "All cashiers at Siam store",
+  });
+  await assignTicket(retail, { ticketId: t.id, agentId: retail.id, reason: "Retail on-call" });
+  const inHours = (h: number) => new Date(Date.now() + h * 3600_000).toISOString();
+  const net = await createTask(retail, t.id, { title: "Network investigation", description: "Check store router and VPN tunnel to HQ.", teamId: await team("INFRA"), dueDate: inHours(2) });
+  const pos = await createTask(retail, t.id, { title: "POS troubleshooting", teamId: await team("RETAIL"), agentId: retail.id, dueDate: inHours(4) });
+  await createTask(retail, t.id, { title: "ERP interface investigation", description: "Verify POS → ERP sales interface queue.", teamId: await team("ERP"), dueDate: inHours(-3) });
+  await createTask(retail, t.id, { title: "Payment terminal investigation", teamId: await team("VENDOR-B"), dueDate: inHours(6), isRequired: false });
+  const infra = await actorFor("infra");
+  await assignTask(infra, net.id, { agentId: infra.id });
+  await changeTaskStatus(infra, net.id, { status: "IN_PROGRESS" });
+  await changeTaskStatus(infra, net.id, { status: "COMPLETED", reason: "Router rebooted; VPN tunnel re-established." });
+  await changeTaskStatus(retail, pos.id, { status: "IN_PROGRESS" });
+  console.log(`✅ Multi-team demo ticket ${t.number} with 4 tasks.`);
+}
+
+async function demoTickets() {
   const cat = async (code: string) => (await prisma.category.findUniqueOrThrow({ where: { code } })).id;
   const status = async (code: string) => (await prisma.ticketStatus.findUniqueOrThrow({ where: { code } })).id;
   const created: { id: string; number: string; key: string }[] = [];

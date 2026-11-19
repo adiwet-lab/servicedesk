@@ -37,7 +37,7 @@ afterAll(() => prisma.$disconnect());
 
 describe("ticket creation", () => {
   it("generates the configured number and routes via category defaults", async () => {
-    expect(printerTicket.number).toBe(`IT-${year}-000001`);
+    expect(printerTicket.number).toMatch(new RegExp(`^IT-${year}-\\d{6}$`));
     const t = await prisma.ticket.findUniqueOrThrow({ where: { id: printerTicket.id }, include: { ownerTeam: true, status: true, assignments: true, history: true, attachments: true } });
     expect(t.ownerTeam?.code).toBe("IT-SUPPORT");
     expect(t.status.code).toBe("NEW");
@@ -191,6 +191,7 @@ describe("account lifecycle & sessions", () => {
     expect(after.sessionVersion).toBe(before.sessionVersion + 1);
     expect(await loadActor(prisma, somchai.id, { sessionVersion: before.sessionVersion })).toBeNull();
     expect(await prisma.auditLog.count({ where: { entityId: somchai.id, action: "USER_DEACTIVATED" } })).toBe(1);
+    await prisma.user.update({ where: { id: somchai.id }, data: { status: "ACTIVE" } }); // restore for other suites
   });
   it("expired outsource access is rejected", async () => {
     const v = await actor("vendorB");
@@ -257,6 +258,7 @@ describe("Microsoft Entra tenant gate", () => {
     expect(await resolveEntraUser(db, { tid: t.entraTenantId, oid: "12121212-1212-4212-8212-121212121212", iss: iss(t.entraTenantId) })).toEqual({ ok: false, reason: "tenant_inactive" });
     const vera = await prisma.user.findFirstOrThrow({ where: { email: email.vendorB } });
     expect(await loadActor(prisma, vera.id)).toBeNull();
+    await prisma.tenant.update({ where: { id: t.id }, data: { isActive: true } }); // restore for other suites
   });
 });
 

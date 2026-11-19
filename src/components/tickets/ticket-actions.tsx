@@ -10,7 +10,7 @@ import { Alert, Field } from "@/components/ui/misc";
 
 interface Transition { id: string; name: string; kind: string; color: string; requiresReason: boolean }
 
-export function StatusChanger({ ticketId, transitions }: { ticketId: string; transitions: Transition[] }) {
+export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { ticketId: string; transitions: Transition[]; blockingTasks?: { number: string; title: string }[] }) {
   const [target, setTarget] = useState<Transition | null>(null);
   const [state, action, pending] = useActionState(changeStatusAction, null);
   useEffect(() => { if (state?.ok) setTarget(null); }, [state]);
@@ -44,6 +44,12 @@ export function StatusChanger({ ticketId, transitions }: { ticketId: string; tra
             <input type="hidden" name="ticketId" value={ticketId} />
             <input type="hidden" name="toStatusId" value={target?.id ?? ""} />
             {state && !state.ok && <Alert variant="destructive">{state.error}</Alert>}
+            {target?.kind === "RESOLVED" && blockingTasks.length > 0 && (
+              <Alert variant="warning">
+                <strong>Required tasks still open:</strong>
+                <ul className="mt-1 list-disc pl-5">{blockingTasks.map((b) => <li key={b.number}>{b.number} — {b.title}</li>)}</ul>
+              </Alert>
+            )}
             {target?.kind === "RESOLVED" ? (
               <Field label="Resolution summary" htmlFor="resolutionSummary" required>
                 <Textarea id="resolutionSummary" name="resolutionSummary" required minLength={3} rows={5} />

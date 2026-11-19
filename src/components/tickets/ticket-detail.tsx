@@ -8,6 +8,10 @@ import type { Actor } from "@/server/authz/actor";
 import { NotFoundError } from "@/server/authz/errors";
 import { getTicketDetail } from "@/server/services/tickets";
 import { getSettings } from "@/server/services/settings";
+import { getTicketTasks } from "@/server/services/tasks";
+import { getTicketEditOptions } from "@/server/services/ticket-updates";
+import { TaskPanel } from "@/components/tasks/task-panel";
+import { EditTicketDialog, EscalateDialog, TeamsCard, TimelineView } from "./ticket-extra";
 import { removeAttachmentAction, takeOwnershipAction } from "@/server/actions/tickets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,12 +31,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-const HISTORY_LABEL: Record<string, string> = {
-  CREATED: "created the ticket", STATUS_CHANGED: "changed status", REOPENED: "reopened the ticket", TEAM_CHANGED: "transferred to team",
-  AGENT_CHANGED: "changed assignee", ATTACHMENT_ADDED: "added attachment", ATTACHMENT_REMOVED: "removed attachment", FIELD_UPDATED: "updated",
-};
-
-export async function TicketDetail({ actor, idOrNumber, backHref, created }: { actor: Actor; idOrNumber: string; backHref: string; created?: boolean }) {
+export async function TicketDetail({ actor, idOrNumber, backHref, created, initialTab }: { actor: Actor; idOrNumber: string; backHref: string; created?: boolean; initialTab?: string }) {
   let detail;
   try {
     detail = await getTicketDetail(actor, decodeURIComponent(idOrNumber));
@@ -40,8 +39,12 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created }: { a
     if (e instanceof NotFoundError) notFound();
     throw e;
   }
-  const { ticket: t, permissions: perm, allowedTransitions } = detail;
-  const settings = await getSettings(prisma);
+  const { ticket: t, permissions: perm, allowedTransitions, blockingTasks } = detail;
+  const [settings, taskData] = await Promise.all([getSettings(prisma), getTicketTasks(actor, t)]);
+  // Options are needed by anyone who can edit, escalate, manage teams/tasks or (re)assign/edit any visible task.
+  const needsOptions = perm.canEdit || perm.canEscalate || perm.canManageTasks || perm.canManageSupportingTeams
+    || taskData.tasks.some((task) => task.perm.canAssignOthers || task.perm.canWork);
+  const editOptions = needsOptions ? await getTicketEditOptions() : null;
   const [teams, agents] = perm.canAssign
     ? await Promise.all([
         prisma.supportTeam.findMany({ where: { isActive: true, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -76,7 +79,9 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created }: { a
           {perm.canAssign && !closed && (
             <AssignDialog ticketId={t.id} teams={teams} currentTeamId={t.ownerTeamId} currentAgentId={t.assignedAgentId} canTransfer={perm.canTransfer} initialAgents={agents} />
           )}
-          <StatusChanger ticketId={t.id} transitions={allowedTransitions} />
+          {perm.canEdit && editOptions && <EditTicketDialog ticket={t} options={editOptions} />}
+          {perm.canEscalate && editOptions && <EscalateDialog ticketId={t.id} currentPriorityLevel={t.priority.level} currentTeamId={t.ownerTeamId} options={editOptions} />}
+          <StatusChanger ticketId={t.id} transitions={allowedTransitions} blockingTasks={blockingTasks} />
         </div>
       </div>
 
@@ -93,34 +98,20 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created }: { a
             <CardContent><p className="whitespace-pre-wrap text-sm leading-relaxed">{t.description}</p></CardContent>
           </Card>
 
-          <Tabs defaultValue="timeline">
+          <Tabs defaultValue={initialTab === "tasks" ? "tasks" : "timeline"}>
             <TabsList>
               <TabsTrigger value="timeline"><History className="size-4" /> Timeline</TabsTrigger>
+              <TabsTrigger value="tasks" data-testid="tab-tasks"><ListChecks className="size-4" /> Tasks ({taskData.progress.total})</TabsTrigger>
               <TabsTrigger value="attachments"><Paperclip className="size-4" /> Attachments ({t.attachments.length})</TabsTrigger>
-              <TabsTrigger value="tasks"><ListChecks className="size-4" /> Tasks</TabsTrigger>
               <TabsTrigger value="chat"><MessageSquare className="size-4" /> Chat</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
-              <Card>
-                <CardContent className="pt-5">
-                  <ol className="relative space-y-5 border-l pl-6" data-testid="timeline">
-                    {t.history.map((h) => (
-                      <li key={h.id} className="relative">
-                        <span className="absolute -left-[31px] top-0.5 flex size-4 items-center justify-center rounded-full border-2 border-card bg-primary/70" />
-                        <p className="text-sm">
-                          <span className="font-medium">{h.actor?.displayName ?? "System"}</span>{" "}
-                          <span className="text-muted-foreground">{HISTORY_LABEL[h.action] ?? h.action.toLowerCase()}</span>
-                          {h.oldValue || h.newValue ? (
-                            <span> {h.oldValue && <><span className="line-through decoration-muted-foreground/50">{h.oldValue}</span> → </>}<span className="font-medium">{h.newValue}</span></span>
-                          ) : null}
-                        </p>
-                        {h.reason && <p className="mt-1 rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-wrap">{h.reason}</p>}
-                        <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(h.createdAt)}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </CardContent>
-              </Card>
+              <TimelineView items={detail.timeline} />
+            </TabsContent>
+            <TabsContent value="tasks">
+              <TaskPanel ticketId={t.id} tasks={taskData.tasks} progress={taskData.progress} hiddenCount={taskData.hiddenCount}
+                canCreate={perm.canManageTasks} readOnly={false}
+                teams={editOptions?.teams ?? []} priorities={editOptions?.priorities ?? []} defaultTeamId={t.ownerTeamId} />
             </TabsContent>
             <TabsContent value="attachments">
               <Card>
@@ -148,9 +139,6 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created }: { a
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="tasks">
-              <Card><CardContent className="pt-5 text-sm text-muted-foreground">Sub-tasks across multiple support teams arrive in <Badge variant="secondary">Phase 2</Badge>. Required tasks will block resolution.</CardContent></Card>
-            </TabsContent>
             <TabsContent value="chat">
               <Card><CardContent className="pt-5 text-sm text-muted-foreground">Real-time chat with public messages and internal notes arrives in <Badge variant="secondary">Phase 3</Badge>.</CardContent></Card>
             </TabsContent>
@@ -177,6 +165,9 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created }: { a
               </dl>
             </CardContent>
           </Card>
+          <TeamsCard ticketId={t.id} owner={t.ownerTeam ? { id: t.ownerTeam.id, name: t.ownerTeam.name } : null} agent={t.assignedAgent?.displayName ?? null}
+            supporting={t.supportingTeams.map((s) => s.team)} openTasksByTeam={detail.openTasksByTeam} canManage={perm.canManageSupportingTeams}
+            teams={editOptions?.teams ?? []} />
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Clock className="size-4" /> SLA</CardTitle></CardHeader>
             <CardContent>

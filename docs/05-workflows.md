@@ -61,21 +61,46 @@ stateDiagram-v2
 | AUTO | routing on create | system |
 Each change records previous/new team, previous/new agent, who, when, reason.
 
-## Task workflow (Phase 2 — schema in place)
+## Task workflow (Phase 2 — implemented)
+Task statuses are fixed by the specification (enum); ticket statuses remain fully configurable.
 ```mermaid
 stateDiagram-v2
   [*] --> Open
-  Open --> Assigned
+  Open --> Assigned : agent assigned (automatic)
+  Assigned --> Open : agent removed (automatic)
+  Open --> InProgress
+  Open --> Cancelled : reason
   Assigned --> InProgress
-  InProgress --> Waiting
-  Waiting --> InProgress
+  Assigned --> Waiting : reason
+  Assigned --> Cancelled : reason
+  InProgress --> Waiting : reason
   InProgress --> Completed
-  Open --> Cancelled
-  Assigned --> Cancelled
-  InProgress --> Cancelled
-  Waiting --> Cancelled
+  InProgress --> Cancelled : reason
+  Waiting --> InProgress
+  Waiting --> Cancelled : reason
+  Completed --> InProgress : reopen (owner-team staff only)
 ```
-- A ticket keeps one **owner team + responsible agent**; other teams contribute via tasks (`TicketTask.teamId`) and appear as *supporting teams*, gaining read access through the data scope — no ticket transfer needed.
-- Each task: own team/agent, priority, start/due date, required/optional flag, attachments, history (`TaskHistory`, `TaskAssignment`).
-- Ticket progress = completed required tasks / required tasks; RESOLVED blocked until all required tasks are COMPLETED (already enforced by the workflow validator).
-- Views: My Tasks (agent), Team Tasks (lead), All Tasks (admin), Overdue highlighting (`dueDate < now` and not terminal).
+Implemented in `src/server/domain/task-workflow.ts` (pure, unit-tested) and `src/server/services/tasks.ts`.
+
+**Multiple teams without transferring the ticket**
+- A ticket keeps one **main owner team + responsible agent**. Other teams contribute through **tasks**; creating/moving a task to a non-owner team automatically adds it as a **supporting team** (also manageable manually from the ticket's *Teams* card; removal is blocked while that team has open tasks).
+- Supporting/task teams gain read access to the ticket through the data scope. Vendor users additionally see **only their own team's tasks** (others are counted, not shown), and task events of other teams are filtered out of their timeline.
+
+**Rules**
+| Action | Who |
+|---|---|
+| Create task | `task.manage` + can work the ticket (owner team, responsible agent, admins) |
+| Update fields / change status | `task.manage` + task team member, task assignee, owner-team staff or admins |
+| Change required/optional, reopen completed | owner side only (not vendors / other teams) |
+| Assign / reassign / move team | `task.assign` (leads, admins) who can work the ticket or lead the task's team; others may only **self-assign** within their own team. Moving teams needs a reason. Agent must be an active team member. |
+| Requester | read-only: tasks, status, progress, history |
+
+- Waiting / Cancelled need a reason; Completed sets `completedAt`; first move to In Progress sets `startDate`.
+- Every change writes `TaskHistory`, a summarised `TicketHistory` entry (unified ticket timeline), `AuditLog` (`TASK_CREATED` / `TASK_ASSIGNED` / `TASK_UPDATED`) and notifications (task assignee, ticket's responsible agent; team on creation; "all required tasks done" to the responsible agent).
+- **Resolution gating**: a ticket cannot be RESOLVED while any **required** task is not Completed/Cancelled; the resolve dialog lists the blocking tasks.
+- Tasks of closed/cancelled tickets are frozen (except `ticket.closed.edit`).
+- Views: *My Tasks*, *Team Tasks*, *Overdue Tasks* (support staff), *All Tasks* (`ticket.read.all`) with search, filters, sorting, pagination; overdue rows highlighted.
+
+## Ticket edits & escalation (Phase 2)
+- Staff who can work a ticket edit subject, description, category/subcategory (required-field rules re-checked), priority, branch/location, contact, asset, affected system/users, confidential flag. One history row per field; `CATEGORY_CHANGED` / `PRIORITY_CHANGED` / `TICKET_UPDATED` audit; SLA due dates recomputed (from creation time) when category or priority changes.
+- **Escalate** (`ticket.escalate`, team leads/admins): optionally move to another team and/or **raise** priority, with mandatory reason; recorded as `TicketAssignment(type=ESCALATE)`; the target team's leads are notified.

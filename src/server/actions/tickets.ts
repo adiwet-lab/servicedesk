@@ -77,7 +77,7 @@ export async function markNotificationsReadAction(fd: FormData) {
 export async function teamAgentsAction(teamId: string) {
   const actor = await requireActorOrThrow();
   const { canAny } = await import("@/server/authz/guards");
-  if (!canAny(actor, ["ticket.assign"])) return [];
+  if (!canAny(actor, ["ticket.assign", "task.assign"])) return [];
   return prisma.user.findMany({
     where: { status: "ACTIVE", deletedAt: null, teamMemberships: { some: { teamId } } },
     select: { id: true, displayName: true }, orderBy: { displayName: "asc" },

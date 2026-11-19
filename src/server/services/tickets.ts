@@ -6,7 +6,7 @@ import { isVendor } from "@/server/authz/actor";
 import { can, requirePermission } from "@/server/authz/guards";
 import { NotFoundError, ValidationError, AuthorizationError } from "@/server/authz/errors";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
-import { canAssignTicket, canWorkTicket, ticketScopeWhere } from "@/server/authz/scope";
+import { canAssignTicket, canManageTicketTasks, canWorkTicket, taskScopeWhere, ticketScopeWhere } from "@/server/authz/scope";
 import { ACTIVE_KINDS, isTransitionAllowed, validateTransition } from "@/server/domain/workflow";
 import { resolveRouting } from "@/server/domain/routing";
 import { enforceRateLimit } from "@/server/ratelimit";
@@ -165,11 +165,12 @@ export async function getTicketDetail(actor: Actor, idOrNumber: string) {
       },
       slaProfile: { select: { id: true, name: true, warningPercent: true } },
       attachments: {
-        where: { deletedAt: null, messageId: null },
+        where: { deletedAt: null, messageId: null, taskId: null },
         include: { uploadedBy: { select: { displayName: true } } },
         orderBy: { createdAt: "asc" },
       },
-      history: { include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 200 },
+      history: { include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 500 },
+      supportingTeams: { include: { team: { select: { id: true, name: true, type: true } } }, orderBy: { addedAt: "asc" } },
       assignments: {
         include: {
           prevTeam: { select: { name: true } }, newTeam: { select: { name: true } },
@@ -178,10 +179,28 @@ export async function getTicketDetail(actor: Actor, idOrNumber: string) {
         },
         orderBy: { createdAt: "desc" },
       },
-      tasks: { select: { id: true, isRequired: true, status: true } },
+      tasks: { select: { id: true, number: true, title: true, isRequired: true, status: true, teamId: true, assignedAgentId: true } },
     },
   });
   if (!ticket) throw new NotFoundError("Ticket not found or you do not have access.");
+
+  // Vendors only see timeline entries of tasks they can see.
+  const visibleTaskNumbers = new Set(
+    isVendor(actor)
+      ? ticket.tasks.filter((t) => t.assignedAgentId === actor.id || (t.teamId && actor.teamIds.includes(t.teamId))).map((t) => t.number)
+      : ticket.tasks.map((t) => t.number),
+  );
+  const timeline = ticket.history
+    .filter((h) => {
+      if (!h.action.startsWith("TASK_")) return true;
+      const num = h.field ?? h.newValue?.split(" ")[0] ?? "";
+      return visibleTaskNumbers.has(num);
+    })
+    .map((h) => ({ ...h, category: timelineCategory(h.action) }));
+  const openTasksByTeam = new Map<string, number>();
+  for (const t of ticket.tasks) {
+    if (t.teamId && t.status !== "COMPLETED" && t.status !== "CANCELLED") openTasksByTeam.set(t.teamId, (openTasksByTeam.get(t.teamId) ?? 0) + 1);
+  }
 
   const isRequester = ticket.requesterId === actor.id;
   const canWork = canWorkTicket(actor, ticket);
@@ -202,17 +221,29 @@ export async function getTicketDetail(actor: Actor, idOrNumber: string) {
     .map((tr) => ({ id: tr.toStatus.id, name: tr.toStatus.name, kind: tr.toStatus.kind, color: tr.toStatus.color,
       requiresReason: tr.toStatus.requiresReason || tr.toStatus.kind === "WAITING" || tr.requiresComment }));
 
+  const closedLocked = ["CLOSED", "CANCELLED"].includes(ticket.status.kind) && !can(actor, P.TICKET_CLOSED_EDIT);
+  const blockingTasks = ticket.tasks
+    .filter((t) => t.isRequired && t.status !== "COMPLETED" && t.status !== "CANCELLED" && visibleTaskNumbers.has(t.number))
+    .map((t) => ({ number: t.number, title: t.title }));
+
   return {
     ticket,
+    timeline,
+    openTasksByTeam: Object.fromEntries(openTasksByTeam),
     permissions: {
       isRequester,
       canWork,
       canAssign: canAssignTicket(actor, ticket),
       canTransfer: canAssignTicket(actor, ticket) && (can(actor, P.TICKET_TRANSFER) || can(actor, P.TICKET_READ_ALL)),
       canUpload: (isRequester || canWork) && !["CLOSED", "CANCELLED"].includes(ticket.status.kind),
+      canEdit: canWork && !isVendor(actor) && !closedLocked,
+      canEscalate: can(actor, P.TICKET_ESCALATE) && !isVendor(actor) && canWork && !closedLocked,
+      canManageTasks: canManageTicketTasks(actor, ticket) && !closedLocked,
+      canManageSupportingTeams: canAssignTicket(actor, ticket) && !closedLocked,
     },
     allowedTransitions,
     openRequiredTasks,
+    blockingTasks,
   };
 }
 
@@ -418,7 +449,7 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
 
 // ───────────────────────────── Status change ─────────────────────────────
 
-async function loadTicketForMutation(actor: Actor, ticketId: string) {
+export async function loadTicketForMutation(actor: Actor, ticketId: string) {
   const t = await prisma.ticket.findFirst({
     where: { AND: [ticketScopeWhere(actor), { id: ticketId }] },
     include: { status: true, tasks: { select: { isRequired: true, status: true } } },
@@ -653,6 +684,10 @@ export async function readAttachment(actor: Actor, attachmentId: string) {
   });
   if (!att) throw new NotFoundError();
   if (att.message?.type === "INTERNAL" && (!can(actor, P.NOTE_INTERNAL_READ) || isVendor(actor))) throw new NotFoundError();
+  if (att.taskId) {
+    const visible = await prisma.ticketTask.count({ where: { AND: [taskScopeWhere(actor), { id: att.taskId }] } });
+    if (!visible) throw new NotFoundError();
+  }
   const storage = await getStorage();
   return { att, data: await storage.get(att.storageKey) };
 }
@@ -694,4 +729,15 @@ export async function getCreateTicketOptions(actor: Actor) {
 
 export function statusKindLabel(kind: StatusKind) {
   return kind.charAt(0) + kind.slice(1).toLowerCase();
+}
+
+export type TimelineCategory = "status" | "assignment" | "tasks" | "fields" | "attachments" | "other";
+
+export function timelineCategory(action: string): TimelineCategory {
+  if (action === "STATUS_CHANGED" || action === "REOPENED" || action === "CREATED") return "status";
+  if (["AGENT_CHANGED", "TEAM_CHANGED", "ESCALATED", "SUPPORTING_TEAM_ADDED", "SUPPORTING_TEAM_REMOVED"].includes(action)) return "assignment";
+  if (action.startsWith("TASK_")) return "tasks";
+  if (action === "FIELD_UPDATED" || action === "CATEGORY_CHANGED" || action === "PRIORITY_CHANGED") return "fields";
+  if (action.startsWith("ATTACHMENT_")) return "attachments";
+  return "other";
 }

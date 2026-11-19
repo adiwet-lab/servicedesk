@@ -2,6 +2,7 @@ import { requireAdminPortal } from "@/server/auth/get-actor";
 import { canAny } from "@/server/authz/guards";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { getDashboardStats } from "@/server/services/dashboard";
+import { taskKpis } from "@/server/services/tasks";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard } from "@/components/dashboard/kpi";
@@ -17,7 +18,7 @@ export default async function AdminDashboard() {
   if (!canAny(actor, [P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL])) {
     return <PageHeader title="Admin Portal" description="Use the menu to manage configuration." />;
   }
-  const s = await getDashboardStats(actor);
+  const [s, tk] = await Promise.all([getDashboardStats(actor), taskKpis(actor)]);
   const k = s.kpis;
   const t = (view: string) => `/admin/tickets?view=${view}`;
   return (
@@ -37,6 +38,9 @@ export default async function AdminDashboard() {
         <KpiCard label="SLA Breached" value={k.slaBreached} href={t("breached")} tone="danger" color="#dc2626" />
         <KpiCard label="SLA Compliance" value={k.slaCompliance == null ? "—" : `${k.slaCompliance}%`} tone="success" color="#16a34a" hint="Resolved within due date" />
         <KpiCard label="Avg Response" value={dur(k.avgResponseMin)} color="#64748b" hint={`Avg resolution ${dur(k.avgResolutionMin)}`} />
+        {tk && <KpiCard label="My Open Tasks" value={tk.mine} href="/admin/tasks?view=my" color="#f59e0b" />}
+        {tk && <KpiCard label="Team Open Tasks" value={tk.team} href="/admin/tasks?view=team" color="#8b5cf6" />}
+        {tk && <KpiCard label="Overdue Tasks" value={tk.overdue} href="/admin/tasks?view=overdue" tone="danger" color="#ef4444" />}
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
         <Card><CardHeader><CardTitle className="text-base">Ticket trend</CardTitle></CardHeader><CardContent><TrendChart data={s.trend} /></CardContent></Card>

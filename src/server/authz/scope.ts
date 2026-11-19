@@ -101,3 +101,56 @@ export function messageScopeWhere(actor: Actor): Prisma.TicketMessageWhereInput 
   if (actor.permissions.has(P.NOTE_INTERNAL_READ) && !isVendor(actor)) return { deletedAt: null };
   return { deletedAt: null, type: "PUBLIC" };
 }
+
+// ───────────────────────────── Tasks ─────────────────────────────
+
+/**
+ * Task visibility: the parent ticket must be visible. Vendor users are further
+ * limited to tasks of their own teams or tasks assigned to them.
+ */
+export function taskScopeWhere(actor: Actor): Prisma.TicketTaskWhereInput {
+  const base: Prisma.TicketTaskWhereInput = { ticket: ticketScopeWhere(actor) };
+  if (!isVendor(actor)) return base;
+  return { AND: [base, { OR: [{ teamId: { in: actor.teamIds } }, { assignedAgentId: actor.id }] }] };
+}
+
+/** Create tasks on a ticket: task.manage + able to work the ticket. */
+export function canManageTicketTasks(actor: Actor, ticket: { ownerTeamId: string | null; assignedAgentId: string | null }): boolean {
+  return actor.permissions.has(P.TASK_MANAGE) && canWorkTicket(actor, ticket);
+}
+
+type TaskLite = { teamId: string | null; assignedAgentId: string | null };
+type TicketLite = { ownerTeamId: string | null; assignedAgentId: string | null };
+
+/** Update / change status of a task. */
+export function canWorkTask(actor: Actor, task: TaskLite, ticket: TicketLite): boolean {
+  if (!actor.permissions.has(P.TASK_MANAGE)) return false;
+  if (task.assignedAgentId === actor.id) return true;
+  if (task.teamId && actor.teamIds.includes(task.teamId)) return true;
+  if (isVendor(actor)) return false;
+  return canWorkTicket(actor, ticket);
+}
+
+/** Reopen a completed task — owner-team staff / ticket assignee / admins only. */
+export function canReopenTask(actor: Actor, ticket: TicketLite): boolean {
+  return !isVendor(actor) && actor.permissions.has(P.TASK_MANAGE) && canWorkTicket(actor, ticket);
+}
+
+/**
+ * Assign / reassign a task to a team/agent.
+ *  - task.assign holders who can work the ticket (or lead the task's team) may assign anyone
+ *  - otherwise only self-assignment within a team the actor belongs to
+ */
+export function canAssignTask(
+  actor: Actor,
+  task: TaskLite,
+  ticket: TicketLite,
+  target: { teamId: string | null; agentId: string | null },
+): boolean {
+  if (!actor.permissions.has(P.TASK_MANAGE)) return false;
+  const leadsTaskTeam = !!task.teamId && actor.leadTeamIds.includes(task.teamId);
+  if (actor.permissions.has(P.TASK_ASSIGN) && !isVendor(actor) && (canWorkTicket(actor, ticket) || leadsTaskTeam)) return true;
+  // Self-assignment within own team, team unchanged
+  const teamUnchanged = target.teamId === task.teamId;
+  return teamUnchanged && target.agentId === actor.id && !!task.teamId && actor.teamIds.includes(task.teamId);
+}

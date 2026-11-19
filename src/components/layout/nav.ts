@@ -41,10 +41,10 @@ export function adminNav(actor: Actor): NavSection[] {
     {
       title: "Task Management",
       items: [
-        { label: "All Tasks", href: "/admin/soon/all-tasks", icon: "tasks", perm: P.TASK_READ, soon: "P2" },
-        { label: "My Tasks", href: "/admin/soon/my-tasks", icon: "tasks", perm: P.TASK_READ, soon: "P2" },
-        { label: "Team Tasks", href: "/admin/soon/team-tasks", icon: "tasks", perm: P.TASK_READ, soon: "P2" },
-        { label: "Overdue Tasks", href: "/admin/soon/overdue-tasks", icon: "clock", perm: P.TASK_READ, soon: "P2" },
+        { label: "All Tasks", href: "/admin/tasks?view=all", icon: "tasks", perm: P.TICKET_READ_ALL },
+        { label: "My Tasks", href: "/admin/tasks?view=my", icon: "tasks", perm: P.TASK_READ },
+        { label: "Team Tasks", href: "/admin/tasks?view=team", icon: "team", perm: P.TASK_READ },
+        { label: "Overdue Tasks", href: "/admin/tasks?view=overdue", icon: "clock", perm: P.TASK_READ },
       ],
     },
     {

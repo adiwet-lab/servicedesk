@@ -3,8 +3,9 @@ import { TicketDetail } from "@/components/tickets/ticket-detail";
 
 export const metadata = { title: "Ticket" };
 
-export default async function AdminTicketPage({ params }: { params: Promise<{ number: string }> }) {
+export default async function AdminTicketPage({ params, searchParams }: { params: Promise<{ number: string }>; searchParams: Promise<{ task?: string }> }) {
   const actor = await requireAdminPortal();
   const { number } = await params;
-  return <TicketDetail actor={actor} idOrNumber={number} backHref="/admin/tickets" />;
+  const sp = await searchParams;
+  return <TicketDetail actor={actor} idOrNumber={number} backHref="/admin/tickets" initialTab={sp.task ? "tasks" : undefined} />;
 }

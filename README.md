@@ -6,7 +6,7 @@ Two portals:
 - **User Portal** (`/dashboard`, `/tickets…`) — employees create and follow tickets.
 - **Admin / IT Support Portal** (`/admin…`) — agents, team leads, outsource vendors and administrators.
 
-> **Status: Phase 1 (Foundation) delivered.** See [docs/07-roadmap.md](docs/07-roadmap.md) for Phases 2–6.
+> **Status: Phase 1 (Foundation) and Phase 2 (Workflow: tasks, multi-team, assignment, escalation, history) delivered.** See [docs/07-roadmap.md](docs/07-roadmap.md) for Phases 3–6.
 
 ## Documentation
 | Doc | Contents |
@@ -47,7 +47,7 @@ pnpm db:seed
 pnpm db:demo
 ```
 
-(`db:demo` is optional; it creates sample tickets through the real service layer.)
+(`db:demo` is optional; it creates sample tickets through the real service layer, plus the multi-team example "Branch POS cannot operate" with tasks for Infrastructure, Retail, ERP and Vendor B. It is idempotent.)
 
 ```bash
 pnpm dev
@@ -61,7 +61,8 @@ Open http://localhost:3000 and use **Developer login** to pick a demo user:
 | Ethan Employee | Employee (own + department) | Department Tickets |
 | Somchai Store | Employee (own + branch) | Branch Tickets |
 | Ana Agent | Support Agent – IT Support | Team queue, workflow |
-| Lee Lead | Team Lead – IT Support | Assign / transfer |
+| Lee Lead | Team Lead – IT Support | Assign / transfer / escalate / tasks |
+| Ivan Infra / Rita Retail / Erin ERP | Leads/agents of Infrastructure, Retail, ERP | Team Tasks, multi-team POS demo |
 | Victor VendorA / Vera VendorB | Outsource Support (external tenants, expiring) | Team-scoped vendor access |
 | Mia Manager | Dashboard Viewer | Management dashboard |
 | Alex Admin | System Admin | Configuration, users |
@@ -110,12 +111,12 @@ Unit tests (pure logic, no DB): scope/RBAC, workflow, routing, numbering, busine
 ```bash
 pnpm test:integration
 ```
-Integration tests run the services against a **fresh throwaway PostgreSQL database per run**: created via `TEST_DATABASE_ADMIN_URL` (default `postgresql://servicedesk:servicedesk@localhost:5432/postgres`, user needs `CREATEDB`), migrated with `prisma migrate deploy`, seeded, then dropped. Set `KEEP_TEST_DB=1` to keep it. Covered: routing, numbering under concurrency, required fields, data scope (own/dept/confidential/vendor isolation), attachment authorization, workflow and assignment rules, append-only audit trigger, deactivation/expiry/session revocation, vendor permission stripping, privilege escalation, tenant gate.
+Integration tests run the services against a **fresh throwaway PostgreSQL database per run**: created via `TEST_DATABASE_ADMIN_URL` (default `postgresql://servicedesk:servicedesk@localhost:5432/postgres`, user needs `CREATEDB`), migrated with `prisma migrate deploy`, seeded, then dropped. Set `KEEP_TEST_DB=1` to keep it. Covered (Phase 2): task numbering, supporting-team auto-add, vendor task isolation, requester read-only tasks, self-assign vs `task.assign`, reasons, reopen rules, task attachment authorization, required-task resolution gating, task list scopes, frozen tasks on closed tickets, ticket field edits + SLA recalculation, supporting-team removal guard, escalation rules. Covered (Phase 1): routing, numbering under concurrency, required fields, data scope (own/dept/confidential/vendor isolation), attachment authorization, workflow and assignment rules, append-only audit trigger, deactivation/expiry/session revocation, vendor permission stripping, privilege escalation, tenant gate.
 
 ```bash
 pnpm test:e2e
 ```
-Playwright E2E against `pnpm dev` (reuses a running server on :3000) with the seeded database: create ticket → agent workflow (reason/resolution enforced) → requester closes → cross-user access denied; admin adds a subcategory; employee blocked from admin; deactivated user signed out immediately.
+Playwright E2E (12 tests) against `pnpm dev` (reuses a running server on :3000) with the seeded database: create ticket → agent workflow (reason/resolution enforced) → requester closes → cross-user access denied; admin adds a subcategory; employee blocked from admin; deactivated user signed out immediately; multi-team task flow (lead creates Infrastructure task → resolve blocked → Infrastructure lead completes it from Team Tasks → resolve succeeds → requester sees progress read-only; vendor denied).
 
 ---
 
