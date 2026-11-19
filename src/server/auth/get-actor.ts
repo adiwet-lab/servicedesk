@@ -8,12 +8,9 @@ import { loadActor } from "./load-actor";
 import type { Actor } from "@/server/authz/actor";
 import { AuthorizationError } from "@/server/authz/errors";
 import { canAccessAdminPortal } from "@/server/authz/guards";
+import { clientIp } from "@/server/net";
 
-export function clientIp(h: Headers): string | null {
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip");
-}
+export { clientIp } from "@/server/net";
 
 /** Current actor or null. Cached per request; reloads user state from DB every request. */
 export const getActor = cache(async (): Promise<Actor | null> => {

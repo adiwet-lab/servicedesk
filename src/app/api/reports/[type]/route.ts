@@ -17,7 +17,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ type: st
   const url = new URL(req.url);
   const filters = parseAnalyticsFilters(Object.fromEntries(url.searchParams.entries()));
   try {
-    enforceRateLimit(`report:${actor.id}`, 10, 60_000);
+    await enforceRateLimit(`report:${actor.id}`, 10, 60_000);
     const r = await runReport(actor, type, filters);
     await prisma.$transaction((tx) => audit(tx, actor, {
       action: "REPORT_EXPORTED", entityType: "Report", entityId: type, newValue: { type, filters, rows: r.rows.length, truncated: r.truncated },

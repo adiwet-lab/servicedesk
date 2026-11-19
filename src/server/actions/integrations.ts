@@ -85,7 +85,7 @@ export async function testAssetAction(tag: string) {
 export async function lookupAssetAction(tag: string) {
   const actor = await requireActorOrThrow();
   if (typeof tag !== "string" || tag.length > 64) return { provider: null, asset: null, error: "Invalid asset tag." };
-  if (!rateLimiter.hit(`asset:lookup:${actor.id}`, 30, 60_000)) return { provider: null, asset: null, error: "Too many lookups — try again in a minute." };
+  if (!(await rateLimiter.hit(`asset:lookup:${actor.id}`, 30, 60_000))) return { provider: null, asset: null, error: "Too many lookups — try again in a minute." };
   const r = await lookupAsset(tag);
   // Employees only confirm the device; who holds it and where stays with IT staff.
   const staff = !isVendor(actor) && canAny(actor, [P.TICKET_READ_TEAM, P.TICKET_READ_ALL]);

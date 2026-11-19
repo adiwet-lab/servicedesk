@@ -68,7 +68,7 @@ export async function authenticateBi(authHeader: string | null) {
   if (!t || t.revokedAt) throw new BiError(401, "Invalid or revoked token.");
   if (t.expiresAt && t.expiresAt <= new Date()) throw new BiError(403, "Token expired.");
   if (!t.scopes.includes(BI_SCOPE)) throw new BiError(403, "Token lacks the bi.read scope.");
-  if (!rateLimiter.hit(`bi:${t.id}`, 120, 60_000)) throw new BiError(429, "Rate limit exceeded (120 requests/minute).");
+  if (!(await rateLimiter.hit(`bi:${t.id}`, 120, 60_000))) throw new BiError(429, "Rate limit exceeded (120 requests/minute).");
   // Throttle last-used writes to one per minute.
   if (!t.lastUsedAt || Date.now() - t.lastUsedAt.getTime() > 60_000) await prisma.apiToken.update({ where: { id: t.id }, data: { lastUsedAt: new Date() } });
   return t;

@@ -123,7 +123,7 @@ export async function listMessages(actor: Actor, ticketId: string, opts: { befor
 // ───────────────────────────── Post ─────────────────────────────
 
 export async function postMessage(actor: Actor, ticketId: string, raw: unknown, files: UploadCandidate[] = []) {
-  enforceRateLimit(`chat:${actor.id}`, 30, 60_000);
+  await enforceRateLimit(`chat:${actor.id}`, 30, 60_000);
   const parsed = postSchema.safeParse(raw);
   if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid message");
   const { type } = parsed.data;

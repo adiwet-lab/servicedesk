@@ -1,3 +1,4 @@
+import { clientIp as resolveClientIp, REMOTE_ADDR_HEADER } from "@/server/net";
 import type { Server as HttpServer, IncomingMessage } from "node:http";
 import { Server, type Socket } from "socket.io";
 import type { PrismaClient } from "@prisma/client";
@@ -22,8 +23,12 @@ interface SocketData {
 }
 
 function clientIp(req: IncomingMessage) {
-  const xff = req.headers["x-forwarded-for"];
-  return (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? null;
+  const get = (name: string) => {
+    if (name === REMOTE_ADDR_HEADER) return req.socket.remoteAddress ?? null; // never trust a client-sent value
+    const v = req.headers[name];
+    return (Array.isArray(v) ? v.join(",") : v) ?? null;
+  };
+  return resolveClientIp({ get });
 }
 
 /**

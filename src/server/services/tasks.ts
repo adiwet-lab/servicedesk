@@ -104,7 +104,7 @@ const taskLink = (ticketNumber: string, taskNumber: string) => `/admin/tickets/$
 // ───────────────────────────── Create ─────────────────────────────
 
 export async function createTask(actor: Actor, ticketId: string, raw: unknown) {
-  enforceRateLimit(`task:create:${actor.id}`, 100, 60 * 60 * 1000);
+  await enforceRateLimit(`task:create:${actor.id}`, 100, 60 * 60 * 1000);
   const ticket = await prisma.ticket.findFirst({ where: { AND: [ticketScopeWhere(actor), { id: ticketId }] }, ...ticketForTask });
   if (!ticket) throw new NotFoundError("Ticket not found or you do not have access.");
   if (!canManageTicketTasks(actor, ticket)) throw new AuthorizationError("You cannot create tasks on this ticket.");
@@ -319,7 +319,7 @@ export async function assignTask(actor: Actor, taskId: string, input: { teamId?:
 // ───────────────────────────── Attachments ─────────────────────────────
 
 export async function addTaskAttachments(actor: Actor, taskId: string, files: UploadCandidate[]) {
-  enforceRateLimit(`upload:${actor.id}`, 60, 60 * 60 * 1000);
+  await enforceRateLimit(`upload:${actor.id}`, 60, 60 * 60 * 1000);
   const task = await loadTask(actor, taskId);
   if (!canWorkTask(actor, task, task.ticket)) throw new AuthorizationError();
   assertTicketOpen(actor, task.ticket.status.kind);

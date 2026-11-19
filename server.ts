@@ -4,6 +4,7 @@
  *   prod:  pnpm build && pnpm start   (node dist/server.js)
  */
 import { createServer } from "node:http";
+import { REMOTE_ADDR_HEADER } from "@/server/net";
 import next from "next";
 import { prisma } from "@/server/db";
 import { createRealtimeServer } from "@/server/realtime/socket-server";
@@ -20,6 +21,8 @@ async function main() {
   await app.prepare();
 
   const server = createServer((req, res) => {
+    // Unspoofable peer address for rate limiting / audit (client-sent values are overwritten).
+    req.headers[REMOTE_ADDR_HEADER] = req.socket.remoteAddress ?? "";
     void handle(req, res);
   });
   // Next.js dev HMR uses websocket upgrades on the same server.

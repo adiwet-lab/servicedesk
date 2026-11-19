@@ -267,7 +267,7 @@ export interface CreateTicketResult {
 
 export async function createTicket(actor: Actor, raw: unknown, files: UploadCandidate[] = []): Promise<CreateTicketResult> {
   requirePermission(actor, P.TICKET_CREATE);
-  enforceRateLimit(`ticket:create:${actor.id}`, 20, 60 * 60 * 1000);
+  await enforceRateLimit(`ticket:create:${actor.id}`, 20, 60 * 60 * 1000);
 
   const parsed = createTicketSchema.safeParse(raw);
   if (!parsed.success) {
@@ -658,7 +658,7 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
 // ───────────────────────────── Attachments ─────────────────────────────
 
 export async function addTicketAttachments(actor: Actor, ticketId: string, files: UploadCandidate[]) {
-  enforceRateLimit(`upload:${actor.id}`, 60, 60 * 60 * 1000);
+  await enforceRateLimit(`upload:${actor.id}`, 60, 60 * 60 * 1000);
   const ticket = await loadTicketForMutation(actor, ticketId);
   const isRequester = ticket.requesterId === actor.id;
   if (!isRequester && !canWorkTicket(actor, ticket)) throw new AuthorizationError();

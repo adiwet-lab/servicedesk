@@ -217,7 +217,7 @@ async function checkCategory(id: string | null) {
 
 export async function createArticle(actor: Actor, raw: unknown, opts: { sourceTicketId?: string } = {}) {
   if (!canWriteKb(actor)) throw new AuthorizationError("You cannot write knowledge articles.");
-  enforceRateLimit(`kb:create:${actor.id}`, 60, 60 * 60 * 1000);
+  await enforceRateLimit(`kb:create:${actor.id}`, 60, 60 * 60 * 1000);
   const input = parseArticle(raw);
   await checkCategory(input.categoryId);
   return transaction(async (tx) => {
@@ -300,7 +300,7 @@ export const feedbackSchema = z.object({
 export async function giveFeedback(actor: Actor, articleId: string, raw: unknown, opts: { deflected?: boolean } = {}) {
   const a = await prisma.kbArticle.findFirst({ where: { AND: [kbReadWhere(actor), { id: articleId }] }, select: { id: true, number: true } });
   if (!a) throw new NotFoundError("Article not found.");
-  enforceRateLimit(`kb:feedback:${actor.id}`, 120, 60 * 60 * 1000);
+  await enforceRateLimit(`kb:feedback:${actor.id}`, 120, 60 * 60 * 1000);
   const { helpful, comment } = feedbackSchema.parse(raw);
   await transaction(async (tx) => {
     await tx.kbFeedback.upsert({
