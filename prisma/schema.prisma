@@ -1,0 +1,1134 @@
+// Enterprise IT Service Desk — core data model.
+// The full schema for Phases 1–4 is defined up-front; roadmap (Phase 6) fields
+// are present but nullable so later phases need only additive migrations.
+
+generator client {
+  provider      = "prisma-client-js"
+  // native for local dev; debian-openssl-3.0.x for the Docker image
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum TenantType {
+  INTERNAL
+  VENDOR
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  INACTIVE
+}
+
+enum TicketVisibility {
+  OWN
+  OWN_DEPT
+  OWN_BRANCH
+  OWN_DEPT_BRANCH
+}
+
+enum TeamType {
+  INTERNAL
+  VENDOR
+  OUTSOURCE
+}
+
+enum TeamMemberRole {
+  MEMBER
+  LEAD
+}
+
+enum StatusKind {
+  NEW
+  OPEN
+  WAITING
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum AssignmentType {
+  AUTO
+  ASSIGN
+  REASSIGN
+  TRANSFER
+  ESCALATE
+}
+
+enum TaskStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  CANCELLED
+}
+
+enum MessageType {
+  PUBLIC
+  INTERNAL
+}
+
+enum SlaClock {
+  RESPONSE
+  RESOLUTION
+}
+
+enum SlaEventType {
+  STARTED
+  PAUSED
+  RESUMED
+  WARNING
+  BREACHED
+  MET
+  ESCALATED
+}
+
+enum MajorIncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApproverType {
+  REQUESTER_MANAGER
+  SPECIFIC_USER
+}
+
+enum ApprovalDecision {
+  WAITING
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ScanStatus {
+  NOT_SCANNED
+  PENDING
+  CLEAN
+  INFECTED
+}
+
+enum OutboxStatus {
+  PENDING
+  SENT
+  FAILED
+  DEAD
+}
+
+enum KbArticleType {
+  FAQ
+  TROUBLESHOOTING
+  HOW_TO
+}
+
+enum KbVisibility {
+  EMPLOYEES
+  SUPPORT_ONLY
+}
+
+enum KbStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ImpactScope {
+  SINGLE_USER
+  SINGLE_BRANCH
+  MULTIPLE_BRANCHES
+  COMPANY_WIDE
+  MULTIPLE_COMPANIES
+}
+
+// ─────────────────────── Identity & Organization ───────────────────────
+
+model Tenant {
+  id                  String        @id @default(cuid())
+  entraTenantId       String        @unique // Microsoft Entra "tid" (GUID)
+  name                String
+  type                TenantType    @default(INTERNAL)
+  primaryDomain       String? // informational only; never used for authorization
+  companyId           String?
+  company             Company?      @relation(fields: [companyId], references: [id])
+  isActive            Boolean       @default(true)
+  autoProvisionUsers  Boolean       @default(false)
+  /// Microsoft Graph directory sync (app-only, User.Read.All).
+  graphSyncEnabled    Boolean       @default(false)
+  lastGraphSyncAt     DateTime?
+  lastGraphSyncResult Json?
+  defaultRoleId       String?
+  defaultRole         Role?         @relation(fields: [defaultRoleId], references: [id])
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  users               User[]
+  supportTeams        SupportTeam[]
+}
+
+model Company {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        String
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  tenants     Tenant[]
+  departments Department[]
+  branches    Branch[]
+  users       User[]
+  teams       SupportTeam[]
+  tickets     Ticket[]
+}
+
+model Department {
+  id        String    @id @default(cuid())
+  code      String
+  name      String
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id])
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  users     User[]
+  tickets   Ticket[]
+
+  @@unique([companyId, code])
+}
+
+model Branch {
+  id         String                 @id @default(cuid())
+  code       String
+  name       String
+  companyId  String
+  company    Company                @relation(fields: [companyId], references: [id])
+  address    String?
+  isActive   Boolean                @default(true)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  deletedAt  DateTime?
+  locations  Location[]
+  users      User[]
+  tickets    Ticket[]
+  impactedBy TicketImpactedBranch[]
+
+  @@unique([companyId, code])
+}
+
+model Location {
+  id        String    @id @default(cuid())
+  code      String
+  name      String
+  branchId  String
+  branch    Branch    @relation(fields: [branchId], references: [id])
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  users     User[]
+  tickets   Ticket[]
+
+  @@unique([branchId, code])
+}
+
+model User {
+  id               String           @id @default(cuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  entraObjectId    String? // Microsoft "oid"; null until first sign-in for admin-precreated users
+  email            String
+  displayName      String
+  employeeId       String?
+  jobTitle         String?
+  contactNumber    String?
+  companyId        String?
+  company          Company?         @relation(fields: [companyId], references: [id])
+  departmentId     String?
+  department       Department?      @relation(fields: [departmentId], references: [id])
+  branchId         String?
+  branch           Branch?          @relation(fields: [branchId], references: [id])
+  locationId       String?
+  location         Location?        @relation(fields: [locationId], references: [id])
+  managerId        String?
+  manager          User?            @relation("UserManager", fields: [managerId], references: [id])
+  reports          User[]           @relation("UserManager")
+  status           UserStatus       @default(ACTIVE)
+  accessExpiresAt  DateTime?
+  /// Last time an access-expiry notice was sent (once per expiry window).
+  expiryNotifiedAt DateTime?
+  ticketVisibility TicketVisibility @default(OWN)
+  sessionVersion   Int              @default(1)
+  lastLoginAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  roles                UserRole[]
+  teamMemberships      TeamMember[]
+  ledTeams             SupportTeam[]      @relation("TeamLead")
+  requestedTickets     Ticket[]           @relation("TicketRequester")
+  assignedTickets      Ticket[]           @relation("TicketAgent")
+  createdTickets       Ticket[]           @relation("TicketCreatedBy")
+  ticketHistory        TicketHistory[]
+  assignmentsMade      TicketAssignment[] @relation("AssignmentChangedBy")
+  assignmentsPrevAgent TicketAssignment[] @relation("AssignmentPrevAgent")
+  assignmentsNewAgent  TicketAssignment[] @relation("AssignmentNewAgent")
+  tasksAssigned        TicketTask[]       @relation("TaskAgent")
+  tasksCreated         TicketTask[]       @relation("TaskCreatedBy")
+  taskAssignmentsMade  TaskAssignment[]   @relation("TaskAssignmentBy")
+  taskAssignmentsTo    TaskAssignment[]   @relation("TaskAssignmentAgent")
+  taskHistory          TaskHistory[]
+  messages             TicketMessage[]
+  messageReads         MessageRead[]
+  attachments          TicketAttachment[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  routingRules         RoutingRule[]
+  majorDeclared        Ticket[]           @relation("MajorDeclaredBy")
+  incidentUpdates      IncidentUpdate[]
+  kbAuthored           KbArticle[]        @relation("KbAuthor")
+  kbEdited             KbArticle[]        @relation("KbEditor")
+  kbFeedback           KbFeedback[]
+  approvalSteps        ApprovalStep[]     @relation("ApprovalStepApprover")
+  approvalFallbacks    ApprovalStep[]     @relation("ApprovalStepFallback")
+  ticketApprovals      TicketApproval[]   @relation("TicketApprover")
+  apiTokens            ApiToken[]         @relation("ApiTokenCreator")
+
+  @@unique([tenantId, entraObjectId])
+  @@index([email])
+  @@index([departmentId])
+  @@index([branchId])
+  @@index([status])
+}
+
+model Role {
+  id                      String           @id @default(cuid())
+  code                    String           @unique
+  name                    String
+  description             String?
+  isSystem                Boolean          @default(false)
+  defaultTicketVisibility TicketVisibility @default(OWN)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  permissions             RolePermission[]
+  users                   UserRole[]
+  tenantsDefault          Tenant[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  description String?
+  group       String
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, roleId])
+}
+
+// ─────────────────────────── Support Teams ───────────────────────────
+
+model SupportTeam {
+  id              String                 @id @default(cuid())
+  code            String                 @unique
+  name            String
+  description     String?
+  type            TeamType               @default(INTERNAL)
+  companyId       String?
+  company         Company?               @relation(fields: [companyId], references: [id])
+  tenantId        String?
+  tenant          Tenant?                @relation(fields: [tenantId], references: [id])
+  leadId          String?
+  lead            User?                  @relation("TeamLead", fields: [leadId], references: [id])
+  slaProfileId    String?
+  slaProfile      SlaProfile?            @relation(fields: [slaProfileId], references: [id])
+  /// Teams incoming-webhook / Workflows URL, AES-GCM encrypted at rest.
+  teamsWebhookEnc String?
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  deletedAt       DateTime?
+  members         TeamMember[]
+  categories      TeamCategory[]
+  defaultFor      Category[]             @relation("CategoryDefaultTeam")
+  ownedTickets    Ticket[]               @relation("TicketOwnerTeam")
+  supporting      TicketSupportingTeam[]
+  tasks           TicketTask[]
+  routingRules    RoutingRule[]
+  prevAssign      TicketAssignment[]     @relation("AssignmentPrevTeam")
+  newAssign       TicketAssignment[]     @relation("AssignmentNewTeam")
+  taskAssign      TaskAssignment[]
+  escalations     EscalationRule[]
+}
+
+model TeamMember {
+  teamId    String
+  team      SupportTeam    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamMemberRole @default(MEMBER)
+  createdAt DateTime       @default(now())
+
+  @@id([teamId, userId])
+  @@index([userId])
+}
+
+model TeamCategory {
+  teamId     String
+  team       SupportTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, categoryId])
+}
+
+// ───────────────────────────── Catalog ─────────────────────────────
+
+model Priority {
+  id         String       @id @default(cuid())
+  code       String       @unique // e.g. P1
+  name       String
+  level      Int          @unique // 1 = most urgent
+  color      String       @default("#64748b")
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  tickets    Ticket[]
+  tasks      TicketTask[]
+  categories Category[]
+  slaTargets SlaTarget[]
+}
+
+/// Hierarchical category tree. parentId = null → Main Category; otherwise Subcategory.
+model Category {
+  id                String          @id @default(cuid())
+  parentId          String?
+  parent            Category?       @relation("CategoryTree", fields: [parentId], references: [id])
+  children          Category[]      @relation("CategoryTree")
+  code              String          @unique
+  name              String
+  description       String?
+  defaultTeamId     String?
+  defaultTeam       SupportTeam?    @relation("CategoryDefaultTeam", fields: [defaultTeamId], references: [id])
+  defaultPriorityId String?
+  defaultPriority   Priority?       @relation(fields: [defaultPriorityId], references: [id])
+  slaProfileId      String?
+  slaProfile        SlaProfile?     @relation(fields: [slaProfileId], references: [id])
+  /// Array of ticket field keys that become mandatory, e.g. ["relatedAsset","contactNumber"]
+  requiredFields    Json            @default("[]")
+  /// Reserved for Phase 2 workflow rules (e.g. auto task templates)
+  workflowRules     Json            @default("{}")
+  isActive          Boolean         @default(true)
+  sortOrder         Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+  teams             TeamCategory[]
+  mainTickets       Ticket[]        @relation("TicketCategory")
+  subTickets        Ticket[]        @relation("TicketSubcategory")
+  routingRules      RoutingRule[]
+  kbArticles        KbArticle[]
+  approvalPolicy    ApprovalPolicy?
+
+  @@index([parentId])
+}
+
+/// Ordered auto-assignment rules evaluated after category defaults.
+model RoutingRule {
+  id            String      @id @default(cuid())
+  name          String
+  order         Int         @default(100)
+  categoryId    String?
+  category      Category?   @relation(fields: [categoryId], references: [id])
+  /// Extra match conditions: { priorityId?, companyId?, branchId?, departmentId? }
+  conditions    Json        @default("{}")
+  targetTeamId  String
+  targetTeam    SupportTeam @relation(fields: [targetTeamId], references: [id])
+  targetAgentId String?
+  targetAgent   User?       @relation(fields: [targetAgentId], references: [id])
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([isActive, order])
+}
+
+// ───────────────────────────── Workflow ─────────────────────────────
+
+model TicketStatus {
+  id              String               @id @default(cuid())
+  code            String               @unique
+  name            String
+  kind            StatusKind
+  color           String               @default("#64748b")
+  order           Int                  @default(0)
+  pausesSla       Boolean              @default(false)
+  requiresReason  Boolean              @default(false)
+  isDefault       Boolean              @default(false) // initial status for new tickets
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  tickets         Ticket[]
+  fromTransitions WorkflowTransition[] @relation("TransitionFrom")
+  toTransitions   WorkflowTransition[] @relation("TransitionTo")
+}
+
+model WorkflowTransition {
+  id                 String       @id @default(cuid())
+  fromStatusId       String
+  fromStatus         TicketStatus @relation("TransitionFrom", fields: [fromStatusId], references: [id], onDelete: Cascade)
+  toStatusId         String
+  toStatus           TicketStatus @relation("TransitionTo", fields: [toStatusId], references: [id], onDelete: Cascade)
+  /// Permission code required for support staff to perform this transition
+  requiredPermission String       @default("ticket.update")
+  /// Requester (ticket owner) may perform it, e.g. reopen or cancel own ticket
+  requesterAllowed   Boolean      @default(false)
+  requiresComment    Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+
+  @@unique([fromStatusId, toStatusId])
+}
+
+// ───────────────────────────── Tickets ─────────────────────────────
+
+model Ticket {
+  id                  String                 @id @default(cuid())
+  number              String                 @unique
+  subject             String
+  description         String
+  categoryId          String
+  category            Category               @relation("TicketCategory", fields: [categoryId], references: [id])
+  subcategoryId       String?
+  subcategory         Category?              @relation("TicketSubcategory", fields: [subcategoryId], references: [id])
+  priorityId          String
+  priority            Priority               @relation(fields: [priorityId], references: [id])
+  statusId            String
+  status              TicketStatus           @relation(fields: [statusId], references: [id])
+  requesterId         String
+  requester           User                   @relation("TicketRequester", fields: [requesterId], references: [id])
+  createdById         String
+  createdBy           User                   @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  companyId           String?
+  company             Company?               @relation(fields: [companyId], references: [id])
+  departmentId        String?
+  department          Department?            @relation(fields: [departmentId], references: [id])
+  branchId            String?
+  branch              Branch?                @relation(fields: [branchId], references: [id])
+  locationId          String?
+  location            Location?              @relation(fields: [locationId], references: [id])
+  contactNumber       String?
+  relatedAsset        String?
+  affectedSystem      String?
+  affectedUsers       String?
+  ownerTeamId         String?
+  ownerTeam           SupportTeam?           @relation("TicketOwnerTeam", fields: [ownerTeamId], references: [id])
+  assignedAgentId     String?
+  assignedAgent       User?                  @relation("TicketAgent", fields: [assignedAgentId], references: [id])
+  isConfidential      Boolean                @default(false)
+  waitingReason       String?
+  resolutionSummary   String?
+  // SLA (Phase 4 computes these; Phase 1 stores targets from profile on create)
+  slaProfileId        String?
+  slaProfile          SlaProfile?            @relation(fields: [slaProfileId], references: [id])
+  responseDueAt       DateTime?
+  resolutionDueAt     DateTime?
+  firstResponseAt     DateTime?
+  slaPausedAt         DateTime?
+  /// Accumulated paused time in BUSINESS minutes of the ticket's SLA calendar (wall minutes for 24x7 targets)
+  slaPausedMinutes    Int                    @default(0)
+  /// SLA target snapshot (minutes) taken at creation and on priority/category change
+  responseTargetMin   Int?
+  resolutionTargetMin Int?
+  /// true = targets measured in the profile's business hours; false = 24x7
+  slaBusinessHours    Boolean                @default(true)
+  responseBreached    Boolean                @default(false)
+  resolutionBreached  Boolean                @default(false)
+  resolvedAt          DateTime?
+  closedAt            DateTime?
+  // Roadmap (Phase 6)
+  impactScope         ImpactScope?
+  isMajorIncident     Boolean                @default(false)
+  parentIncidentId    String?
+  parentIncident      Ticket?                @relation("IncidentChildren", fields: [parentIncidentId], references: [id])
+  childTickets        Ticket[]               @relation("IncidentChildren")
+  majorIncidentStatus MajorIncidentStatus?
+  majorDeclaredAt     DateTime?
+  majorDeclaredById   String?
+  majorDeclaredBy     User?                  @relation("MajorDeclaredBy", fields: [majorDeclaredById], references: [id])
+  impactedUserCount   Int?
+  impactedBranches    TicketImpactedBranch[]
+  incidentUpdates     IncidentUpdate[]
+  kbArticlesFromThis  KbArticle[]            @relation("KbSource")
+  kbLinks             KbArticleTicket[]
+  approvalStatus      ApprovalStatus         @default(NOT_REQUIRED)
+  approvalPolicyId    String?
+  approvalPolicy      ApprovalPolicy?        @relation(fields: [approvalPolicyId], references: [id])
+  approvals           TicketApproval[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  deletedAt           DateTime?
+
+  history         TicketHistory[]
+  assignments     TicketAssignment[]
+  supportingTeams TicketSupportingTeam[]
+  tasks           TicketTask[]
+  messages        TicketMessage[]
+  attachments     TicketAttachment[]
+  tags            TicketTagMapping[]
+  slaEvents       SlaEvent[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@index([statusId])
+  @@index([requesterId])
+  @@index([ownerTeamId])
+  @@index([assignedAgentId])
+  @@index([departmentId])
+  @@index([branchId])
+  @@index([categoryId])
+  @@index([priorityId])
+  @@index([createdAt])
+  @@index([resolutionDueAt])
+  @@index([isMajorIncident, majorIncidentStatus])
+  @@index([parentIncidentId])
+}
+
+model TicketHistory {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String // e.g. CREATED, STATUS_CHANGED, FIELD_UPDATED, ASSIGNED
+  field     String?
+  oldValue  String?
+  newValue  String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketAssignment {
+  id          String         @id @default(cuid())
+  ticketId    String
+  ticket      Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  type        AssignmentType
+  prevTeamId  String?
+  prevTeam    SupportTeam?   @relation("AssignmentPrevTeam", fields: [prevTeamId], references: [id])
+  newTeamId   String?
+  newTeam     SupportTeam?   @relation("AssignmentNewTeam", fields: [newTeamId], references: [id])
+  prevAgentId String?
+  prevAgent   User?          @relation("AssignmentPrevAgent", fields: [prevAgentId], references: [id])
+  newAgentId  String?
+  newAgent    User?          @relation("AssignmentNewAgent", fields: [newAgentId], references: [id])
+  changedById String?
+  changedBy   User?          @relation("AssignmentChangedBy", fields: [changedById], references: [id])
+  reason      String?
+  createdAt   DateTime       @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketSupportingTeam {
+  ticketId String
+  ticket   Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  teamId   String
+  team     SupportTeam @relation(fields: [teamId], references: [id])
+  addedAt  DateTime    @default(now())
+
+  @@id([ticketId, teamId])
+  @@index([teamId])
+}
+
+model TicketTask {
+  id                String             @id @default(cuid())
+  number            String             @unique
+  ticketId          String
+  ticket            Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  teamId            String?
+  team              SupportTeam?       @relation(fields: [teamId], references: [id])
+  assignedAgentId   String?
+  assignedAgent     User?              @relation("TaskAgent", fields: [assignedAgentId], references: [id])
+  priorityId        String?
+  priority          Priority?          @relation(fields: [priorityId], references: [id])
+  status            TaskStatus         @default(OPEN)
+  isRequired        Boolean            @default(true)
+  startDate         DateTime?
+  dueDate           DateTime?
+  completedAt       DateTime?
+  overdueNotifiedAt DateTime?
+  createdById       String
+  createdBy         User               @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  assignments       TaskAssignment[]
+  history           TaskHistory[]
+  attachments       TicketAttachment[]
+
+  @@index([ticketId])
+  @@index([teamId])
+  @@index([assignedAgentId])
+  @@index([status, dueDate])
+}
+
+model TaskAssignment {
+  id          String       @id @default(cuid())
+  taskId      String
+  task        TicketTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  teamId      String?
+  team        SupportTeam? @relation(fields: [teamId], references: [id])
+  agentId     String?
+  agent       User?        @relation("TaskAssignmentAgent", fields: [agentId], references: [id])
+  changedById String?
+  changedBy   User?        @relation("TaskAssignmentBy", fields: [changedById], references: [id])
+  reason      String?
+  createdAt   DateTime     @default(now())
+
+  @@index([taskId])
+}
+
+model TaskHistory {
+  id        String     @id @default(cuid())
+  taskId    String
+  task      TicketTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?      @relation(fields: [actorId], references: [id])
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime   @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+model TicketMessage {
+  id          String             @id @default(cuid())
+  ticketId    String
+  ticket      Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User               @relation(fields: [senderId], references: [id])
+  type        MessageType        @default(PUBLIC)
+  body        String
+  editedAt    DateTime?
+  createdAt   DateTime           @default(now())
+  deletedAt   DateTime?
+  reads       MessageRead[]
+  attachments TicketAttachment[]
+
+  @@index([ticketId, createdAt])
+}
+
+model MessageRead {
+  messageId String
+  message   TicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime      @default(now())
+
+  @@id([messageId, userId])
+  @@index([userId])
+}
+
+model TicketAttachment {
+  id           String         @id @default(cuid())
+  ticketId     String
+  ticket       Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  taskId       String?
+  task         TicketTask?    @relation(fields: [taskId], references: [id])
+  messageId    String?
+  message      TicketMessage? @relation(fields: [messageId], references: [id])
+  uploadedById String
+  uploadedBy   User           @relation(fields: [uploadedById], references: [id])
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  storageKey   String         @unique
+  /// Malware scan state (attachments.malwareScan). PENDING/INFECTED files cannot be downloaded.
+  scanStatus   ScanStatus     @default(NOT_SCANNED)
+  scannedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  deletedAt    DateTime?
+
+  @@index([ticketId])
+}
+
+model TicketTag {
+  id        String             @id @default(cuid())
+  name      String             @unique
+  color     String             @default("#64748b")
+  createdAt DateTime           @default(now())
+  tickets   TicketTagMapping[]
+}
+
+model TicketTagMapping {
+  ticketId String
+  ticket   Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tagId    String
+  tag      TicketTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, tagId])
+}
+
+// ─────────────────────────────── SLA ───────────────────────────────
+
+model BusinessHours {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  timezone  String       @default("Asia/Bangkok")
+  /// { "1": [{"start":"08:30","end":"17:30"}], ... } keyed by ISO weekday 1=Mon..7=Sun
+  schedule  Json
+  isDefault Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  holidays  Holiday[]
+  profiles  SlaProfile[]
+}
+
+model Holiday {
+  id              String        @id @default(cuid())
+  businessHoursId String
+  businessHours   BusinessHours @relation(fields: [businessHoursId], references: [id], onDelete: Cascade)
+  date            DateTime      @db.Date
+  name            String
+  createdAt       DateTime      @default(now())
+
+  @@unique([businessHoursId, date])
+}
+
+model SlaProfile {
+  id               String           @id @default(cuid())
+  name             String           @unique
+  description      String?
+  businessHoursId  String?
+  businessHours    BusinessHours?   @relation(fields: [businessHoursId], references: [id])
+  /// Status codes that pause the SLA clock, e.g. ["WAITING_USER","WAITING_THIRD_PARTY"]
+  pauseStatusCodes Json             @default("[]")
+  warningPercent   Int              @default(75)
+  isDefault        Boolean          @default(false)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  targets          SlaTarget[]
+  categories       Category[]
+  teams            SupportTeam[]
+  tickets          Ticket[]
+  escalations      EscalationRule[]
+}
+
+model SlaTarget {
+  id                String     @id @default(cuid())
+  slaProfileId      String
+  slaProfile        SlaProfile @relation(fields: [slaProfileId], references: [id], onDelete: Cascade)
+  priorityId        String
+  priority          Priority   @relation(fields: [priorityId], references: [id])
+  responseMinutes   Int
+  resolutionMinutes Int
+  businessHoursOnly Boolean    @default(true)
+
+  @@unique([slaProfileId, priorityId])
+}
+
+model SlaEvent {
+  id        String       @id @default(cuid())
+  ticketId  String
+  ticket    Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  clock     SlaClock
+  type      SlaEventType
+  detail    String?
+  createdAt DateTime     @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([ticketId, clock, type])
+}
+
+model EscalationRule {
+  id               String       @id @default(cuid())
+  slaProfileId     String
+  slaProfile       SlaProfile   @relation(fields: [slaProfileId], references: [id], onDelete: Cascade)
+  clock            SlaClock
+  /// percent of SLA elapsed at which the rule fires (e.g. 75, 100)
+  atPercent        Int
+  notifyTeamLead   Boolean      @default(true)
+  escalateToTeamId String?
+  escalateToTeam   SupportTeam? @relation(fields: [escalateToTeamId], references: [id])
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+}
+
+// ───────────────────── Notifications, Audit, Config ─────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketId  String?
+  ticket    Ticket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  type      String // TICKET_CREATED, TICKET_ASSIGNED, STATUS_CHANGED, ...
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// Append-only. UPDATE/DELETE are blocked by a database trigger (see migration).
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String?
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  ticketId   String?
+  ticket     Ticket?  @relation(fields: [ticketId], references: [id])
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([ticketId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+model NumberSequence {
+  key         String   @id // e.g. "TICKET", "TASK"
+  prefix      String
+  /// Tokens: {PREFIX} {YYYY} {YY} {MM} {SEQ:n}
+  format      String   @default("{PREFIX}-{YYYY}-{SEQ:6}")
+  resetYearly Boolean  @default(true)
+  year        Int
+  current     Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ───────────────────────── Major incidents (Phase 6) ─────────────────────────
+
+model TicketImpactedBranch {
+  ticketId String
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  branchId String
+  branch   Branch   @relation(fields: [branchId], references: [id])
+  addedAt  DateTime @default(now())
+
+  @@id([ticketId, branchId])
+  @@index([branchId])
+}
+
+/// Communication log of a major incident (visible to requesters of the incident and linked tickets).
+model IncidentUpdate {
+  id        String              @id @default(cuid())
+  ticketId  String
+  ticket    Ticket              @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User                @relation(fields: [authorId], references: [id])
+  status    MajorIncidentStatus
+  message   String
+  createdAt DateTime            @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+// ───────────────────────────── Knowledge base (Phase 6B) ─────────────────────────────
+
+model KbArticle {
+  id             String            @id @default(cuid())
+  number         String            @unique
+  title          String
+  summary        String            @default("")
+  /// Markdown subset — rendered server-side with full HTML escaping.
+  body           String
+  type           KbArticleType     @default(FAQ)
+  visibility     KbVisibility      @default(EMPLOYEES)
+  status         KbStatus          @default(DRAFT)
+  categoryId     String?
+  category       Category?         @relation(fields: [categoryId], references: [id])
+  tags           String[]          @default([])
+  authorId       String
+  author         User              @relation("KbAuthor", fields: [authorId], references: [id])
+  updatedById    String?
+  updatedBy      User?             @relation("KbEditor", fields: [updatedById], references: [id])
+  sourceTicketId String?
+  sourceTicket   Ticket?           @relation("KbSource", fields: [sourceTicketId], references: [id])
+  viewCount      Int               @default(0)
+  helpfulYes     Int               @default(0)
+  helpfulNo      Int               @default(0)
+  version        Int               @default(1)
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  tickets        KbArticleTicket[]
+  feedback       KbFeedback[]
+
+  @@index([status, visibility])
+  @@index([categoryId])
+}
+
+/// Tickets related to an article (source ticket, tickets solved with it).
+model KbArticleTicket {
+  articleId  String
+  article    KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  ticketId   String
+  ticket     Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  linkedById String?
+  createdAt  DateTime  @default(now())
+
+  @@id([articleId, ticketId])
+  @@index([ticketId])
+}
+
+model KbFeedback {
+  articleId String
+  article   KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  helpful   Boolean
+  comment   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@id([articleId, userId])
+}
+
+// ───────────────────────────── Approvals (Phase 6C) ─────────────────────────────
+
+/**
+ * Approval policy for a main category or subcategory (subcategory wins).
+ */
+model ApprovalPolicy {
+  id         String         @id @default(cuid())
+  name       String
+  categoryId String         @unique
+  category   Category       @relation(fields: [categoryId], references: [id])
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  steps      ApprovalStep[]
+  tickets    Ticket[]
+}
+
+model ApprovalStep {
+  id             String         @id @default(cuid())
+  policyId       String
+  policy         ApprovalPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  order          Int
+  name           String
+  approverType   ApproverType
+  approverUserId String?
+  approverUser   User?          @relation("ApprovalStepApprover", fields: [approverUserId], references: [id])
+  /// Used when the manager is missing/inactive or would approve their own request.
+  fallbackUserId String?
+  fallbackUser   User?          @relation("ApprovalStepFallback", fields: [fallbackUserId], references: [id])
+
+  @@unique([policyId, order])
+}
+
+/**
+ * Snapshot of a ticket's approval chain, resolved when the ticket is created.
+ */
+model TicketApproval {
+  id         String           @id @default(cuid())
+  ticketId   String
+  ticket     Ticket           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  stepOrder  Int
+  stepName   String
+  approverId String
+  approver   User             @relation("TicketApprover", fields: [approverId], references: [id])
+  decision   ApprovalDecision @default(WAITING)
+  comment    String?
+  decidedAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@unique([ticketId, stepOrder])
+  @@index([approverId, decision])
+}
+
+// ───────────────────────────── Integrations (Phase 6D) ─────────────────────────────
+
+/**
+ * Asynchronous outbound deliveries (Teams cards …) with retry/backoff; also the delivery log.
+ */
+model IntegrationOutbox {
+  id            String       @id @default(cuid())
+  channel       String // "teams"
+  event         String // e.g. TICKET_CREATED
+  /// Logical destination (e.g. "team:<id>") — the secret URL is resolved at send time.
+  target        String
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  nextAttemptAt DateTime     @default(now())
+  lastError     String?
+  ticketId      String?
+  createdAt     DateTime     @default(now())
+  sentAt        DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
+}
+
+/**
+ * Bearer tokens for read-only reporting feeds (Power BI). Only the SHA-256 hash is stored.
+ */
+model ApiToken {
+  id           String    @id @default(cuid())
+  name         String
+  tokenHash    String    @unique
+  /// First characters of the token, shown to identify it.
+  prefix       String
+  scopes       String[]
+  includeNames Boolean   @default(false)
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  createdById  String
+  createdBy    User      @relation("ApiTokenCreator", fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now())
+}
