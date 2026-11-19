@@ -1,6 +1,7 @@
 import { randomUUID, createHash } from "node:crypto";
 import type { Prisma, StatusKind } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { transaction } from "@/server/db-tx";
 import type { Actor } from "@/server/authz/actor";
 import { isVendor } from "@/server/authz/actor";
 import { can, requirePermission } from "@/server/authz/guards";
@@ -376,7 +377,7 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await transaction(async (tx) => {
       const number = await nextNumber(tx, "TICKET", now);
       const ticket = await tx.ticket.create({
         data: {
@@ -506,7 +507,7 @@ export async function changeTicketStatus(
     upd.slaPausedMinutes = ticket.slaPausedMinutes + Math.round((now.getTime() - ticket.slaPausedAt.getTime()) / 60000);
   }
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     // Optimistic concurrency: only succeeds if status unchanged since we read it.
     const res = await tx.ticket.updateMany({ where: { id: ticket.id, statusId: ticket.statusId }, data: upd as Prisma.TicketUncheckedUpdateManyInput });
     if (res.count !== 1) throw new ValidationError("The ticket was changed by someone else. Please reload and try again.");
@@ -571,7 +572,7 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
     }
   }
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticket.update({
       where: { id: ticket.id },
       data: {
@@ -644,7 +645,7 @@ export async function addTicketAttachments(actor: Actor, ticketId: string, files
       await storage.put(key, f.data, f.mime);
       stored.push({ key, f });
     }
-    await prisma.$transaction(async (tx) => {
+    await transaction(async (tx) => {
       for (const s of stored) {
         await tx.ticketAttachment.create({
           data: { ticketId, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime, sizeBytes: s.f.size,
@@ -669,7 +670,7 @@ export async function removeTicketAttachment(actor: Actor, attachmentId: string)
   if (["CLOSED", "CANCELLED"].includes(ticket.status.kind) && !can(actor, P.TICKET_CLOSED_EDIT)) {
     throw new ValidationError("Closed tickets cannot be modified.");
   }
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticketAttachment.update({ where: { id: att.id }, data: { deletedAt: new Date() } });
     await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorId: actor.id, action: "ATTACHMENT_REMOVED", oldValue: att.fileName } });
     await audit(tx, actor, { action: "ATTACHMENT_REMOVED", entityType: "TicketAttachment", entityId: att.id, ticketId: ticket.id, oldValue: { fileName: att.fileName } });

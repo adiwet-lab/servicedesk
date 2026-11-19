@@ -6,7 +6,7 @@ Two portals:
 - **User Portal** (`/dashboard`, `/tickets…`) — employees create and follow tickets.
 - **Admin / IT Support Portal** (`/admin…`) — agents, team leads, outsource vendors and administrators.
 
-> **Status: Phase 1 (Foundation) and Phase 2 (Workflow: tasks, multi-team, assignment, escalation, history) delivered.** See [docs/07-roadmap.md](docs/07-roadmap.md) for Phases 3–6.
+> **Status: Phases 1–3 delivered** — Foundation; Workflow (tasks, multi-team, assignment, escalation, history); Communication (realtime chat, internal notes, attachments, unread, realtime notifications). See [docs/07-roadmap.md](docs/07-roadmap.md) for Phases 4–6.
 
 ## Documentation
 | Doc | Contents |
@@ -52,6 +52,8 @@ pnpm db:demo
 ```bash
 pnpm dev
 ```
+
+`pnpm dev` runs the custom server (`server.ts`: Next.js + Socket.IO realtime on one port). Production: `pnpm build && pnpm start`. Behind a reverse proxy, allow WebSocket upgrades on `/socket.io`; for several instances set `REDIS_URL`.
 
 Open http://localhost:3000 and use **Developer login** to pick a demo user:
 
@@ -111,12 +113,12 @@ Unit tests (pure logic, no DB): scope/RBAC, workflow, routing, numbering, busine
 ```bash
 pnpm test:integration
 ```
-Integration tests run the services against a **fresh throwaway PostgreSQL database per run**: created via `TEST_DATABASE_ADMIN_URL` (default `postgresql://servicedesk:servicedesk@localhost:5432/postgres`, user needs `CREATEDB`), migrated with `prisma migrate deploy`, seeded, then dropped. Set `KEEP_TEST_DB=1` to keep it. Covered (Phase 2): task numbering, supporting-team auto-add, vendor task isolation, requester read-only tasks, self-assign vs `task.assign`, reasons, reopen rules, task attachment authorization, required-task resolution gating, task list scopes, frozen tasks on closed tickets, ticket field edits + SLA recalculation, supporting-team removal guard, escalation rules. Covered (Phase 1): routing, numbering under concurrency, required fields, data scope (own/dept/confidential/vendor isolation), attachment authorization, workflow and assignment rules, append-only audit trigger, deactivation/expiry/session revocation, vendor permission stripping, privilege escalation, tenant gate.
+Integration tests run the services against a **fresh throwaway PostgreSQL database per run**: created via `TEST_DATABASE_ADMIN_URL` (default `postgresql://servicedesk:servicedesk@localhost:5432/postgres`, user needs `CREATEDB`), migrated with `prisma migrate deploy`, seeded, then dropped. Set `KEEP_TEST_DB=1` to keep it. Covered (Phase 3): chat participation rules, internal-note isolation (list/search/inbox/unread/attachments), vendor task-team chat, notification coalescing & disabling, unread/mark-read & read receipts, first-response and requester-reply automation, closed-ticket lock; realtime server: cookie/Origin/deactivation/revocation rejection, room authorization, signal-only payloads, internal-room isolation, `session:revoked` push. Covered (Phase 2): task numbering, supporting-team auto-add, vendor task isolation, requester read-only tasks, self-assign vs `task.assign`, reasons, reopen rules, task attachment authorization, required-task resolution gating, task list scopes, frozen tasks on closed tickets, ticket field edits + SLA recalculation, supporting-team removal guard, escalation rules. Covered (Phase 1): routing, numbering under concurrency, required fields, data scope (own/dept/confidential/vendor isolation), attachment authorization, workflow and assignment rules, append-only audit trigger, deactivation/expiry/session revocation, vendor permission stripping, privilege escalation, tenant gate.
 
 ```bash
 pnpm test:e2e
 ```
-Playwright E2E (12 tests) against `pnpm dev` (reuses a running server on :3000) with the seeded database: create ticket → agent workflow (reason/resolution enforced) → requester closes → cross-user access denied; admin adds a subcategory; employee blocked from admin; deactivated user signed out immediately; multi-team task flow (lead creates Infrastructure task → resolve blocked → Infrastructure lead completes it from Team Tasks → resolve succeeds → requester sees progress read-only; vendor denied).
+Playwright E2E (13 tests) against `pnpm dev` (reuses a running server on :3000) with the seeded database: create ticket → agent workflow (reason/resolution enforced) → requester closes → cross-user access denied; admin adds a subcategory; employee blocked from admin; deactivated user signed out immediately; multi-team task flow (lead creates Infrastructure task → resolve blocked → Infrastructure lead completes it from Team Tasks → resolve succeeds → requester sees progress read-only; vendor denied); two-browser realtime chat (live delivery both ways, internal note hidden from requester, image reply, live bell/Messages badges and toast, inbox, read receipts, search).
 
 ---
 

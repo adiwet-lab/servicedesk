@@ -22,6 +22,10 @@
 | 18 | Transport | HTTPS-ready: HSTS when `APP_URL` is https; TLS terminates at Front Door/App Gateway | `next.config.ts` |
 | 19 | Clickjacking / MIME sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, strict Referrer-Policy | `next.config.ts` |
 | 20 | Race conditions | Atomic numbering; conditional status updates; unique constraints | services |
+| 22 | Cross-site WebSocket hijacking | Socket.IO accepts only allow-listed Origins (APP_URL); session cookie is SameSite=Lax | `realtime/socket-server.ts` (tested) |
+| 23 | Realtime data leakage / stale room membership | Events carry signals only; data re-fetched via authorized actions; room joins re-check scope and actor status; internal room limited to internal note readers; periodic re-validation and `session:revoked` push | `realtime/*` (tested) |
+| 24 | Internal note leakage via search/inbox/counters/files | `messageScopeWhere` applied in list, search, inbox preview and unread SQL; message attachments of internal notes refused to non-readers | `services/messages.ts` (tested) |
+| 25 | Chat spam / abuse | 30 messages/min/user rate limit; 10k character limit; upload validation as for tickets | `services/messages.ts` |
 | 21 | Dev backdoor in production | Dev login disabled when `NODE_ENV=production` regardless of flag (verified on the standalone build) | `auth.ts` |
 
 ## Hardening backlog

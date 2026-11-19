@@ -5,6 +5,7 @@ import { requireActor } from "@/server/auth/get-actor";
 import { can, canAccessAdminPortal } from "@/server/authz/guards";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { listTickets, ticketSummary, availableViews } from "@/server/services/tickets";
+import { unreadCounts } from "@/server/services/messages";
 import { ticketListQuerySchema } from "@/lib/validation/ticket";
 import { PageHeader } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
   const views = availableViews(actor);
   const summary = await ticketSummary(actor, { requesterId: actor.id });
   const recent = views.has("my") ? await listTickets(actor, "my", ticketListQuerySchema.parse({ pageSize: 10 })) : null;
+  const unread = recent ? await unreadCounts(actor, recent.rows.map((r) => r.id)) : {};
 
   return (
     <div>
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
             <Link href="/tickets" className="text-sm text-primary hover:underline">View all</Link>
           </CardHeader>
           <CardContent className="p-0">
-            <TicketTable rows={recent.rows} total={recent.total} page={1} pages={1} base="/tickets" params={{}} />
+            <TicketTable rows={recent.rows} total={recent.total} page={1} pages={1} base="/tickets" params={{}} unread={unread} />
           </CardContent>
         </Card>
       )}

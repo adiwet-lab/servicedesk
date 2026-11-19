@@ -130,7 +130,7 @@ export function AssignDialog({ ticketId, teams, currentTeamId, currentAgentId, c
 export function AttachmentUploader({ ticketId, allowed }: { ticketId: string; allowed: string[] }) {
   const [state, action, pending] = useActionState(uploadAttachmentsAction, null);
   return (
-    <form action={action} className="space-y-2" encType="multipart/form-data">
+    <form action={action} className="space-y-2">
       <input type="hidden" name="ticketId" value={ticketId} />
       <div className="flex items-center gap-2">
         <input name="attachments" type="file" multiple accept={allowed.map((e) => `.${e}`).join(",")} className="text-sm file:mr-3 file:rounded-md file:border file:bg-card file:px-3 file:py-1.5 file:text-sm" aria-label="Choose files" />

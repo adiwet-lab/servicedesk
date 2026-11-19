@@ -34,7 +34,7 @@ export function CreateTicketForm(p: Props) {
   const tooBig = files.find((f) => f.size > p.maxFileSizeMb * 1024 * 1024);
 
   return (
-    <form action={action} className="grid gap-6 lg:grid-cols-3" encType="multipart/form-data">
+    <form action={action} className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         {state && !state.ok && <Alert variant="destructive">{state.error}</Alert>}
         <Card>

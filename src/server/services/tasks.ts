@@ -2,6 +2,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
 import type { Prisma, TaskStatus } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { transaction } from "@/server/db-tx";
 import type { Actor } from "@/server/authz/actor";
 import { isVendor } from "@/server/authz/actor";
 import { can } from "@/server/authz/guards";
@@ -124,7 +125,7 @@ export async function createTask(actor: Actor, ticketId: string, raw: unknown) {
     throw new ValidationError("Invalid priority.", { priorityId: "Invalid priority" });
   }
 
-  return prisma.$transaction(async (tx) => {
+  return transaction(async (tx) => {
     const number = await nextNumber(tx, "TASK");
     const status: TaskStatus = input.agentId ? "ASSIGNED" : "OPEN";
     const task = await tx.ticketTask.create({
@@ -185,7 +186,7 @@ export async function updateTask(actor: Actor, taskId: string, raw: unknown) {
   cmp("required", task.isRequired ? "Required" : "Optional", input.isRequired ? "Required" : "Optional");
   if (changes.length === 0) return;
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticketTask.update({
       where: { id: task.id },
       data: { title: input.title, description: input.description ?? null, priorityId: input.priorityId, startDate: input.startDate, dueDate: input.dueDate, isRequired: input.isRequired },
@@ -219,7 +220,7 @@ export async function changeTaskStatus(actor: Actor, taskId: string, input: { st
   if (err) throw new ValidationError(err);
 
   const now = new Date();
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     const res = await tx.ticketTask.updateMany({
       where: { id: task.id, status: task.status },
       data: {
@@ -281,7 +282,7 @@ export async function assignTask(actor: Actor, taskId: string, input: { teamId?:
   const team = await assertTeamAndAgent(prisma, teamId, agentId);
   const agentName = agentId ? (await prisma.user.findUnique({ where: { id: agentId }, select: { displayName: true } }))?.displayName ?? null : null;
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     const nextStatus: TaskStatus | undefined =
       agentId && task.status === "OPEN" ? "ASSIGNED" : !agentId && task.status === "ASSIGNED" ? "OPEN" : undefined;
     await tx.ticketTask.update({ where: { id: task.id }, data: { teamId, assignedAgentId: agentId, ...(nextStatus ? { status: nextStatus } : {}) } });
@@ -337,7 +338,7 @@ export async function addTaskAttachments(actor: Actor, taskId: string, files: Up
       await storage.put(key, f.data, f.mime);
       stored.push({ key, f });
     }
-    await prisma.$transaction(async (tx) => {
+    await transaction(async (tx) => {
       for (const s of stored) {
         await tx.ticketAttachment.create({
           data: { ticketId: task.ticketId, taskId: task.id, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime, sizeBytes: s.f.size,
@@ -359,7 +360,7 @@ export async function removeTaskAttachment(actor: Actor, attachmentId: string) {
   const task = await loadTask(actor, att.taskId);
   if (!(att.uploadedById === actor.id || canWorkTask(actor, task, task.ticket))) throw new AuthorizationError();
   assertTicketOpen(actor, task.ticket.status.kind);
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticketAttachment.update({ where: { id: att.id }, data: { deletedAt: new Date() } });
     await tx.taskHistory.create({ data: { taskId: task.id, actorId: actor.id, action: "ATTACHMENT_REMOVED", oldValue: att.fileName } });
     await audit(tx, actor, { action: "ATTACHMENT_REMOVED", entityType: "TicketAttachment", entityId: att.id, ticketId: task.ticketId, oldValue: { fileName: att.fileName, task: task.number } });

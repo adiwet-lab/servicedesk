@@ -104,3 +104,11 @@ Implemented in `src/server/domain/task-workflow.ts` (pure, unit-tested) and `src
 ## Ticket edits & escalation (Phase 2)
 - Staff who can work a ticket edit subject, description, category/subcategory (required-field rules re-checked), priority, branch/location, contact, asset, affected system/users, confidential flag. One history row per field; `CATEGORY_CHANGED` / `PRIORITY_CHANGED` / `TICKET_UPDATED` audit; SLA due dates recomputed (from creation time) when category or priority changes.
 - **Escalate** (`ticket.escalate`, team leads/admins): optionally move to another team and/or **raise** priority, with mandatory reason; recorded as `TicketAssignment(type=ESCALATE)`; the target team's leads are notified.
+
+## Ticket communication (Phase 3)
+- **Chat inside the ticket** (Chat tab): public messages (requester ↔ support, multiple agents and teams) and **internal notes** (staff only, amber styling, never exposed to requesters/vendors).
+- Text, images (inline preview) and file attachments; timestamps, sender and role; "Seen by …" read receipts; history with "Load earlier"; in-conversation search with highlighting.
+- **Unread**: per-ticket unread counters (Chat tab badge, 💬 badge in ticket lists, Support Chat / Messages inbox, sidebar badge); opening the conversation marks it read.
+- **Automation**: the first public reply by support staff sets *first response* (SLA); a requester reply to a WAITING ticket moves it to the configured status (default *In Progress*, only if the workflow allows that transition; setting `workflow.requesterReplyStatusCode`).
+- **Notifications**: in-app, realtime (toast + live bell). Chat notifications are coalesced per ticket while unread. Recipients: staff public reply → requester; requester message → responsible agent + active task assignees (or owner team if unassigned); internal note → responsible agent + active task assignees (internal users only). Admins can switch event types off in *Notification Settings*.
+- Every message is audited (`CHAT_MESSAGE` / `INTERNAL_NOTE` with excerpt, `ATTACHMENT_ADDED`).

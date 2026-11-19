@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Lock, TicketX } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Lock, MessageSquare, TicketX } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/misc";
 import { formatAging, formatDateTime } from "@/lib/utils";
@@ -30,9 +30,11 @@ function SortHead({ label, field, base, params }: { label: string; field: string
 }
 
 export function TicketTable({
-  rows, total, page, pages, base, params, detailBase = "/tickets",
+  rows, total, page, pages, base, params, detailBase = "/tickets", unread = {},
 }: {
   rows: TicketListRow[]; total: number; page: number; pages: number; base: string; params: Params; detailBase?: string;
+  /** Unread chat messages per ticket id. */
+  unread?: Record<string, number>;
 }) {
   if (rows.length === 0) {
     return <EmptyState icon={<TicketX />} title="No tickets found" description="Try adjusting the filters or search terms." />;
@@ -64,6 +66,11 @@ export function TicketTable({
               <TableRow key={t.id} className={overdue ? "bg-destructive/5" : undefined}>
                 <TableCell className="font-mono text-xs whitespace-nowrap">
                   <Link href={`${detailBase}/${t.number}`} className="font-semibold text-primary hover:underline">{t.number}</Link>
+                  {(unread[t.id] ?? 0) > 0 && (
+                    <Link href={`${detailBase}/${t.number}?tab=chat`} className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white" title={`${unread[t.id]} unread message(s)`} data-testid="row-unread">
+                      <MessageSquare className="size-2.5" />{unread[t.id]}
+                    </Link>
+                  )}
                 </TableCell>
                 <TableCell className="max-w-72">
                   <Link href={`${detailBase}/${t.number}`} className="line-clamp-2 font-medium hover:underline">

@@ -18,10 +18,10 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}`, trace: "off", screenshot: "only-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `pnpm dev --port ${PORT}`,
+    command: "pnpm dev",
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: true,
     timeout: 120_000,
-    env: { AUTH_DEV_LOGIN: "true" },
+    env: { AUTH_DEV_LOGIN: "true", PORT: String(PORT), APP_URL: `http://localhost:${PORT}` },
   },
 });

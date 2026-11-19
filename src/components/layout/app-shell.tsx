@@ -9,15 +9,29 @@ import { Avatar } from "@/components/ui/misc";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ICONS } from "./icons";
 import type { NavSection } from "./nav";
+import { Toaster } from "@/components/realtime/toaster";
+import { LiveIndicator, RealtimeProvider, useRealtimeContext } from "@/components/realtime/realtime-provider";
 
 export interface ShellUser { name: string; email: string; roles: string[]; tenant: string; vendor: boolean }
 
-export function AppShell({
-  nav, user, unread, portal, canSwitch, signOutAction, children,
-}: {
-  nav: NavSection[]; user: ShellUser; unread: number; portal: "user" | "admin"; canSwitch: boolean;
+type ShellProps = {
+  nav: NavSection[]; user: ShellUser; unread: number; unreadMessages: number; portal: "user" | "admin"; canSwitch: boolean;
   signOutAction: () => Promise<void>; children: React.ReactNode;
-}) {
+};
+
+export function AppShell(props: ShellProps) {
+  return (
+    <Toaster>
+      <RealtimeProvider initialBadges={{ notifications: props.unread, messages: props.unreadMessages }}>
+        <ShellInner {...props} />
+      </RealtimeProvider>
+    </Toaster>
+  );
+}
+
+function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: ShellProps) {
+  const { badges } = useRealtimeContext();
+  const unread = badges.notifications;
   const pathname = usePathname();
   const search = useSearchParams();
   const router = useRouter();
@@ -60,6 +74,9 @@ export function AppShell({
                     >
                       <Icon className={cn("size-4", active ? "text-sidebar-primary" : "text-sidebar-muted")} />
                       <span className="flex-1 truncate">{item.label}</span>
+                      {item.badge === "messages" && badges.messages > 0 && (
+                        <span className="rounded-full bg-sidebar-primary px-1.5 text-[10px] font-semibold text-sidebar" data-testid="nav-messages-badge">{badges.messages}</span>
+                      )}
                       {item.soon && <span className="rounded bg-white/10 px-1.5 text-[10px] text-sidebar-muted">{item.soon}</span>}
                     </Link>
                   </li>
@@ -105,12 +122,13 @@ export function AppShell({
             <input name="q" placeholder="Search tickets, requester, asset…" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" aria-label="Global search" />
           </form>
           <div className="ml-auto flex items-center gap-1">
+            <LiveIndicator />
             <button className="rounded-md p-2 hover:bg-accent" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="Toggle dark mode">
               <Sun className="size-4 dark:hidden" /><Moon className="hidden size-4 dark:block" />
             </button>
             <Link href="/notifications" className="relative rounded-md p-2 hover:bg-accent" aria-label={`Notifications (${unread} unread)`}>
               <Bell className="size-4" />
-              {unread > 0 && <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}
+              {unread > 0 && <span data-testid="bell-count" className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger className="ml-1 flex items-center gap-2 rounded-md p-1 pr-2 hover:bg-accent outline-none" data-testid="user-menu">

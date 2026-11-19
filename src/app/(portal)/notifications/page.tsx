@@ -8,18 +8,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { cn, formatDateTime } from "@/lib/utils";
+import { NOTIFICATION_TYPES } from "@/server/services/notifications";
+import { InboxLiveRefresh } from "@/components/chat/inbox-live";
 
 export const metadata = { title: "Notifications" };
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const actor = await requireActor();
-  const items = await listNotifications(prisma, actor, { take: 100 });
+  const unreadOnly = (await searchParams).filter === "unread";
+  const items = await listNotifications(prisma, actor, { take: 100, unreadOnly });
   return (
     <div className="max-w-3xl">
+      <InboxLiveRefresh />
       <PageHeader title="Notifications" description="In-app notifications about your tickets and assignments."
         actions={items.some((n) => !n.readAt) && (
           <form action={markNotificationsReadAction}><Button variant="outline" type="submit"><Check /> Mark all read</Button></form>
         )} />
+      <div className="mb-3 flex w-fit rounded-md border p-0.5 text-sm">
+        <Link href="/notifications" className={cn("rounded px-3 py-1", !unreadOnly && "bg-muted font-medium")}>All</Link>
+        <Link href="/notifications?filter=unread" className={cn("rounded px-3 py-1", unreadOnly && "bg-muted font-medium")}>Unread</Link>
+      </div>
       <Card>
         <CardContent className="p-0">
           {items.length === 0 ? <EmptyState icon={<BellOff />} title="You're all caught up" /> : (
@@ -30,6 +38,7 @@ export default async function NotificationsPage() {
                   <div className="min-w-0 flex-1">
                     {n.link ? <Link href={n.link} className="font-medium hover:underline">{n.title}</Link> : <p className="font-medium">{n.title}</p>}
                     {n.body && <p className="truncate text-sm text-muted-foreground">{n.body}</p>}
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{NOTIFICATION_TYPES[n.type as keyof typeof NOTIFICATION_TYPES] ?? n.type}</span>
                     <p className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</p>
                   </div>
                   {!n.readAt && (

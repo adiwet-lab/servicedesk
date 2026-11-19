@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { Actor } from "@/server/authz/actor";
+import { queueEvent, rooms } from "@/server/realtime/bus";
 
 type Db = Prisma.TransactionClient;
 
@@ -30,6 +31,15 @@ export async function audit(db: Db, actor: Pick<Actor, "id" | "ip" | "userAgent"
       userAgent: actor?.userAgent?.slice(0, 500) ?? null,
     },
   });
+  // Live-refresh signal for open ticket pages (no data; clients re-fetch with authorization).
+  if (e.ticketId) {
+    const internalOnly = e.action === "INTERNAL_NOTE" || (e.entityType === "TicketMessage" && (e.newValue as { type?: string } | undefined)?.type === "INTERNAL");
+    queueEvent(db, {
+      room: internalOnly ? rooms.ticketInternal(e.ticketId) : rooms.ticket(e.ticketId),
+      event: "ticket:changed",
+      payload: { ticketId: e.ticketId, action: e.action },
+    });
+  }
 }
 
 /** Shallow diff of two records restricted to `keys`. */

@@ -102,6 +102,7 @@ export async function saveSettingsAction(_prev: ActionResult | null, fd: FormDat
       "tickets.requesterCanSetPriority": raw["tickets.requesterCanSetPriority"] === "on",
       "tickets.defaultPriorityCode": raw["tickets.defaultPriorityCode"],
       "workflow.assignedStatusCode": raw["workflow.assignedStatusCode"],
+      "workflow.requesterReplyStatusCode": raw["workflow.requesterReplyStatusCode"] ?? "",
     });
   }, "Settings saved");
   revalidatePath("/admin", "layout");
@@ -115,4 +116,16 @@ export async function saveSequenceAction(_prev: ActionResult<string> | null, fd:
   }, "Numbering saved");
   revalidatePath("/admin", "layout");
   return r;
+}
+
+export async function saveNotificationSettingsAction(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const r = await runAction(async () => {
+    const actor = await requireActorOrThrow();
+    const enabled = new Set(fd.getAll("enabled").map(String));
+    const { NOTIFICATION_TYPES } = await import("@/server/services/notifications");
+    const disabled = Object.keys(NOTIFICATION_TYPES).filter((t) => !enabled.has(t));
+    await saveSystemSettings(actor, { "notifications.disabledTypes": disabled });
+  }, "Notification settings saved");
+  revalidatePath("/admin", "layout");
+  return r as ActionResult;
 }

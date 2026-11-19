@@ -35,7 +35,7 @@ Browser ──HTTPS──▶ Next.js (App Router, React Server Components)
 | Auth | Auth.js v5 — Microsoft Entra ID (OIDC, multi-tenant) + dev-only credentials provider |
 | Validation | zod (shared by forms and services) |
 | Files | `StorageProvider` → local disk (dev) / Azure Blob Storage (prod) |
-| Realtime (Phase 3) | Socket.IO on a custom Node server sharing the Next port; Redis adapter for scale-out (Azure Cache for Redis) |
+| Realtime | Socket.IO on a custom Node server (`server.ts`) sharing the Next port; optional Redis adapter (`REDIS_URL`) for scale-out (Azure Cache for Redis) |
 | Jobs (Phase 4) | `JobRunner` interface — in-process scheduler first, movable to Azure Functions / Container Apps Jobs |
 | Tests | Vitest (unit + integration with throwaway DB), Playwright (E2E) |
 | Deploy | Docker multi-stage (Next standalone), docker-compose for local; Azure Container Apps / App Service + Azure Database for PostgreSQL Flexible Server + Blob Storage + Key Vault |
@@ -55,3 +55,16 @@ Container Apps Job: `migrator` image target → `prisma migrate deploy && seed` 
 - Rate limiter and (Phase 3) realtime fan-out move to Redis when running >1 replica.
 - Hot list queries are index-backed (`status`, `ownerTeamId`, `assignedAgentId`, `requesterId`, `departmentId`, `branchId`, `createdAt`, `resolutionDueAt`).
 - Dashboards use `groupBy` aggregations; Phase 5 adds materialised daily snapshots for large datasets / Power BI.
+
+## Realtime architecture (Phase 3)
+```
+Browser ──socket.io (same origin, session cookie)──▶ server.ts ── Socket.IO server (src/server/realtime/socket-server.ts)
+   ▲                                                     │  auth: Origin allow-list + Auth.js JWT (decode) + loadActor()
+   │ server actions (authorized re-fetch)                │  rooms: user:{id} · ticket:{id} · ticket:{id}:internal
+   └──────────────── Next.js ── services ── transaction() ──▶ bus.queueEvent() ──(after COMMIT)──▶ io.to(room).emit(signal)
+```
+- **Signals, not data.** Events are `{ticketId, messageId?}` / `{type, title}`; clients re-fetch through server actions that re-run `ticketScopeWhere` + `messageScopeWhere`. Internal-note content never travels over sockets and permission changes apply immediately.
+- **After-commit delivery.** `src/server/db-tx.ts#transaction()` collects events queued inside a transaction and emits them only after COMMIT (dropped on rollback).
+- **Room authorization.** `ticket:join` re-loads the actor (status, tenant, expiry, session version) and checks `ticketScopeWhere`; the internal room requires `note.internal.read` and an internal tenant. Sockets are re-validated every 5 minutes; deactivation / "sign out everywhere" pushes `session:revoked`.
+- `audit()` emits a data-less `ticket:changed` for every audited ticket mutation so open ticket pages refresh live (internal-note events go to the internal room only).
+- **Production:** `pnpm build` = `next build` + esbuild bundle of `server.ts` → `dist/server.js`; `pnpm start` runs it. The reverse proxy (Front Door / App Gateway / Container Apps ingress) must allow WebSocket upgrades on `/socket.io`. For >1 replica set `REDIS_URL` (sticky sessions not required with the websocket transport; enable them if the polling fallback is needed).

@@ -6,9 +6,9 @@ import { availableViews } from "@/server/services/tickets";
 export type IconName =
   | "dashboard" | "ticket" | "users" | "building" | "plus" | "bell" | "user" | "inbox" | "alert" | "clock" | "list"
   | "folder" | "flag" | "workflow" | "timer" | "calendar" | "route" | "map" | "briefcase" | "shield" | "key" | "cloud"
-  | "file" | "settings" | "team" | "tasks" | "external";
+  | "file" | "settings" | "team" | "tasks" | "external" | "chat";
 
-export interface NavItem { label: string; href: string; icon: IconName; soon?: string }
+export interface NavItem { label: string; href: string; icon: IconName; soon?: string; badge?: "messages" }
 export interface NavSection { title?: string; items: NavItem[] }
 
 export function portalNav(actor: Actor): NavSection[] {
@@ -18,6 +18,7 @@ export function portalNav(actor: Actor): NavSection[] {
   if (views.has("department")) items.push({ label: "Department Tickets", href: "/tickets/department", icon: "users" });
   if (views.has("branch")) items.push({ label: "Branch Tickets", href: "/tickets/branch", icon: "building" });
   if (can(actor, P.TICKET_CREATE)) items.push({ label: "Create Ticket", href: "/tickets/new", icon: "plus" });
+  if (views.has("my")) items.push({ label: "Messages", href: "/messages", icon: "chat", badge: "messages" });
   items.push({ label: "Notifications", href: "/notifications", icon: "bell" }, { label: "Profile", href: "/profile", icon: "user" });
   return [{ items }];
 }
@@ -36,6 +37,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Assigned to Me", href: "/admin/tickets?view=assigned", icon: "user", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
         { label: "Overdue Tickets", href: "/admin/tickets?view=overdue", icon: "clock", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
         { label: "SLA Breached", href: "/admin/tickets?view=breached", icon: "flag", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL] },
+        { label: "Support Chat", href: "/admin/chat", icon: "chat", perm: [P.TICKET_READ_TEAM, P.TICKET_READ_ALL], badge: "messages" },
       ],
     },
     {
@@ -85,7 +87,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Roles", href: "/admin/system/roles", icon: "shield", perm: P.ADMIN_ROLES },
         { label: "Permissions", href: "/admin/system/permissions", icon: "key", perm: [P.ADMIN_ROLES, P.ADMIN_USERS] },
         { label: "Microsoft Tenants", href: "/admin/system/tenants", icon: "cloud", perm: P.ADMIN_TENANTS },
-        { label: "Notification Settings", href: "/admin/soon/notification-settings", icon: "bell", perm: P.ADMIN_SETTINGS, soon: "P3" },
+        { label: "Notification Settings", href: "/admin/system/notifications", icon: "bell", perm: P.ADMIN_SETTINGS },
         { label: "Audit Logs", href: "/admin/system/audit", icon: "file", perm: P.AUDIT_READ },
         { label: "System Settings", href: "/admin/system/settings", icon: "settings", perm: P.ADMIN_SETTINGS },
       ],
@@ -96,7 +98,7 @@ export function adminNav(actor: Actor): NavSection[] {
       title: s.title,
       items: s.items
         .filter((i) => !i.perm || (Array.isArray(i.perm) ? canAny(actor, i.perm) : can(actor, i.perm)))
-        .map((i) => ({ label: i.label, href: i.href, icon: i.icon, soon: i.soon })),
+        .map((i) => ({ label: i.label, href: i.href, icon: i.icon, soon: i.soon, badge: i.badge })),
     }))
     .filter((s) => s.items.length > 0);
 }

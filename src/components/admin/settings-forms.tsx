@@ -44,6 +44,11 @@ export function SettingsForm({ s, teams, priorities, statuses }: {
           <Field label="Status applied on first agent assignment" htmlFor="as">
             <NativeSelect id="as" name="workflow.assignedStatusCode" defaultValue={String(s["workflow.assignedStatusCode"])}>{statuses.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</NativeSelect>
           </Field>
+          <Field label="When the requester replies to a waiting ticket, move it to" htmlFor="rr">
+            <NativeSelect id="rr" name="workflow.requesterReplyStatusCode" defaultValue={String(s["workflow.requesterReplyStatusCode"] ?? "")}>
+              <option value="">Don&apos;t change status</option>{statuses.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+            </NativeSelect>
+          </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="tickets.requesterCanSetPriority" defaultChecked={!!s["tickets.requesterCanSetPriority"]} className="accent-primary" /> Requesters may choose priority</label>
         </CardContent>
       </Card>

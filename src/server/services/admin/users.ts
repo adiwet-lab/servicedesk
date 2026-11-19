@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { transaction } from "@/server/db-tx";
 import type { Actor } from "@/server/authz/actor";
 import { requirePermission, can } from "@/server/authz/guards";
 import { AuthorizationError, NotFoundError, ValidationError } from "@/server/authz/errors";
 import { PERMISSIONS as P, VENDOR_FORBIDDEN_PERMISSIONS, type PermissionCode } from "@/server/authz/permissions";
 import { audit, diff } from "../audit";
+import { queueEvent, rooms } from "@/server/realtime/bus";
 
 const optId = z.preprocess((v) => (v === "" || v == null ? null : v), z.string().min(1).nullable());
 const optStr = (max: number) => z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), z.string().trim().max(max).nullable().optional());
@@ -141,7 +143,7 @@ export async function updateUser(actor: Actor, id: string, raw: unknown) {
   // Revoke active sessions whenever access-relevant attributes change.
   const revoke = rolesChanged || input.status !== user.status || +(input.accessExpiresAt ?? 0) !== +(user.accessExpiresAt ?? 0) || input.ticketVisibility !== user.ticketVisibility;
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.user.update({ where: { id }, data: { ...fields, ...(revoke ? { sessionVersion: { increment: 1 } } : {}) } });
     if (rolesChanged) {
       await tx.userRole.deleteMany({ where: { userId: id } });
@@ -150,6 +152,7 @@ export async function updateUser(actor: Actor, id: string, raw: unknown) {
       const nm = (ids: string[]) => ids.map((r) => names.find((n) => n.id === r)?.code ?? r);
       await audit(tx, actor, { action: "USER_PERMISSION_CHANGED", entityType: "User", entityId: id, oldValue: { roles: nm(oldRoleIds) }, newValue: { roles: nm(newRoleIds) } });
     }
+    if (revoke) queueEvent(tx, { room: rooms.user(id), event: "session:revoked", payload: {} });
     if (d.changed) {
       const action = input.status === "INACTIVE" && user.status !== "INACTIVE" ? "USER_DEACTIVATED" : "USER_UPDATED";
       await audit(tx, actor, { action, entityType: "User", entityId: id, oldValue: d.oldValue, newValue: d.newValue });
@@ -182,9 +185,10 @@ export async function createUser(actor: Actor, raw: unknown) {
 
 export async function revokeUserSessions(actor: Actor, id: string) {
   requirePermission(actor, P.ADMIN_USERS);
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } });
     await audit(tx, actor, { action: "USER_SESSIONS_REVOKED", entityType: "User", entityId: id });
+    queueEvent(tx, { room: rooms.user(id), event: "session:revoked", payload: {} });
   });
 }
 

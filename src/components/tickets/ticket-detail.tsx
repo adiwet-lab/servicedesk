@@ -10,6 +10,9 @@ import { getTicketDetail } from "@/server/services/tickets";
 import { getSettings } from "@/server/services/settings";
 import { getTicketTasks } from "@/server/services/tasks";
 import { getTicketEditOptions } from "@/server/services/ticket-updates";
+import { getChatPermissions, listMessages, unreadCounts } from "@/server/services/messages";
+import { ChatTabBadge, TicketChat } from "@/components/chat/ticket-chat";
+import { TicketLiveRefresh } from "@/components/realtime/realtime-provider";
 import { TaskPanel } from "@/components/tasks/task-panel";
 import { EditTicketDialog, EscalateDialog, TeamsCard, TimelineView } from "./ticket-extra";
 import { removeAttachmentAction, takeOwnershipAction } from "@/server/actions/tickets";
@@ -40,7 +43,9 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
     throw e;
   }
   const { ticket: t, permissions: perm, allowedTransitions, blockingTasks } = detail;
-  const [settings, taskData] = await Promise.all([getSettings(prisma), getTicketTasks(actor, t)]);
+  const [settings, taskData, chatPerms, chatInitial, chatUnread] = await Promise.all([
+    getSettings(prisma), getTicketTasks(actor, t), getChatPermissions(actor, t.id), listMessages(actor, t.id), unreadCounts(actor, [t.id]),
+  ]);
   // Options are needed by anyone who can edit, escalate, manage teams/tasks or (re)assign/edit any visible task.
   const needsOptions = perm.canEdit || perm.canEscalate || perm.canManageTasks || perm.canManageSupportingTeams
     || taskData.tasks.some((task) => task.perm.canAssignOthers || task.perm.canWork);
@@ -98,12 +103,13 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
             <CardContent><p className="whitespace-pre-wrap text-sm leading-relaxed">{t.description}</p></CardContent>
           </Card>
 
-          <Tabs defaultValue={initialTab === "tasks" ? "tasks" : "timeline"}>
+          <TicketLiveRefresh ticketId={t.id} />
+          <Tabs defaultValue={initialTab === "tasks" || initialTab === "chat" ? initialTab : "timeline"}>
             <TabsList>
               <TabsTrigger value="timeline"><History className="size-4" /> Timeline</TabsTrigger>
               <TabsTrigger value="tasks" data-testid="tab-tasks"><ListChecks className="size-4" /> Tasks ({taskData.progress.total})</TabsTrigger>
               <TabsTrigger value="attachments"><Paperclip className="size-4" /> Attachments ({t.attachments.length})</TabsTrigger>
-              <TabsTrigger value="chat"><MessageSquare className="size-4" /> Chat</TabsTrigger>
+              <TabsTrigger value="chat" data-testid="tab-chat"><MessageSquare className="size-4" /> Chat <ChatTabBadge ticketId={t.id} initial={chatUnread[t.id] ?? 0} /></TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <TimelineView items={detail.timeline} />
@@ -140,7 +146,8 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
               </Card>
             </TabsContent>
             <TabsContent value="chat">
-              <Card><CardContent className="pt-5 text-sm text-muted-foreground">Real-time chat with public messages and internal notes arrives in <Badge variant="secondary">Phase 3</Badge>.</CardContent></Card>
+              <TicketChat ticketId={t.id} perms={chatPerms} initial={chatInitial}
+                maxFileSizeMb={settings["attachments.maxFileSizeMb"]} allowedExtensions={settings["attachments.allowedExtensions"]} />
             </TabsContent>
           </Tabs>
         </div>

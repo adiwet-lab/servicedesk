@@ -69,7 +69,9 @@ Authorization = **permission** (what) × **data scope** (which rows). Both are e
 | Escalate | `ticket.escalate` + can work the ticket (internal only) |
 | Supporting teams add/remove | same as assign (`ticket.assign` within owner team, or read.all) |
 | Task visibility | parent ticket visible; vendors only their own team's / own tasks |
-| Internal notes (Phase 3) | `note.internal.read/write`, never for vendor tenants; filtered in the query (`messageScopeWhere`) |
+| Read public chat | anyone who can see the ticket (incl. dept/branch observers) |
+| Post public chat message | requester, staff who can work the ticket, task team members/assignees; not observers; closed tickets read-only (except `ticket.closed.edit`) |
+| Internal notes | read `note.internal.read`, write `note.internal.write`; internal tenants only; filtered in every query (`messageScopeWhere`) incl. search, inbox previews, unread counts, attachment downloads and realtime rooms |
 
 ## Role intent
 | Role | Typical user | Portal |

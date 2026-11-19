@@ -15,6 +15,10 @@ export const SETTINGS_SCHEMA = {
   "tickets.defaultPriorityCode": z.string().default("P3"),
   /** Status applied automatically when an agent is first assigned (if the workflow allows it). */
   "workflow.assignedStatusCode": z.string().default("ASSIGNED"),
+  /** When the requester replies to a ticket in a WAITING status, move it to this status (empty = off). */
+  "workflow.requesterReplyStatusCode": z.string().default("IN_PROGRESS"),
+  /** Notification types switched off by administrators (in-app channel). */
+  "notifications.disabledTypes": z.array(z.string()).default([]),
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS_SCHEMA;

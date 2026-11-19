@@ -5,7 +5,6 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 
 const FEATURES: Record<string, [string, string, string]> = {
   "escalation-rules": ["Escalation Rules", "Phase 4", "Configure SLA warning/breach escalations (seeded rules are visible under SLA)."],
-  "notification-settings": ["Notification Settings", "Phase 3", "Per-event channel configuration (in-app, email, Microsoft Teams)."],
 };
 
 export default async function SoonPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -10,6 +10,9 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
+  // Same-origin Socket.IO (ws/wss) for realtime chat & notifications.
+  // 'self' covers same-origin ws:/wss: (Socket.IO) in CSP Level 3 browsers; headers are baked at build time,
+  // so no deployment-specific URL here. Dev additionally allows ws: for hot reload.
   `connect-src 'self'${isProd ? "" : " ws: wss:"}`,
   "frame-ancestors 'none'",
   "form-action 'self' https://login.microsoftonline.com",
@@ -27,7 +30,6 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   poweredByHeader: false,
   experimental: {
     serverActions: {

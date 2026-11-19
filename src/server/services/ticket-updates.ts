@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/server/db";
+import { transaction } from "@/server/db-tx";
 import type { Actor } from "@/server/authz/actor";
 import { isVendor } from "@/server/authz/actor";
 import { can } from "@/server/authz/guards";
@@ -129,7 +130,7 @@ export async function updateTicketFields(actor: Actor, ticketId: string, raw: un
       })
     : null;
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticket.update({
       where: { id: ticket.id },
       data: {
@@ -180,7 +181,7 @@ export async function addSupportingTeam(actor: Actor, ticketId: string, teamId: 
   if (!team) throw new ValidationError("Team not found or inactive.");
   const exists = await prisma.ticketSupportingTeam.findUnique({ where: { ticketId_teamId: { ticketId, teamId } } });
   if (exists) throw new ValidationError("This team is already supporting the ticket.");
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticketSupportingTeam.create({ data: { ticketId, teamId } });
     await tx.ticketHistory.create({ data: { ticketId, actorId: actor.id, action: "SUPPORTING_TEAM_ADDED", newValue: team.name } });
     await audit(tx, actor, { action: "SUPPORTING_TEAM_ADDED", entityType: "Ticket", entityId: ticketId, ticketId, newValue: { teamId, team: team.name } });
@@ -199,7 +200,7 @@ export async function removeSupportingTeam(actor: Actor, ticketId: string, teamI
   if (openTasks > 0) throw new ValidationError(`This team still has ${openTasks} open task(s) on the ticket. Complete, cancel or reassign them first.`);
   const link = await prisma.ticketSupportingTeam.findUnique({ where: { ticketId_teamId: { ticketId, teamId } }, include: { team: true } });
   if (!link) throw new ValidationError("This team is not supporting the ticket.");
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticketSupportingTeam.delete({ where: { ticketId_teamId: { ticketId, teamId } } });
     await tx.ticketHistory.create({ data: { ticketId, actorId: actor.id, action: "SUPPORTING_TEAM_REMOVED", oldValue: link.team.name } });
     await audit(tx, actor, { action: "SUPPORTING_TEAM_REMOVED", entityType: "Ticket", entityId: ticketId, ticketId, oldValue: { teamId, team: link.team.name } });
@@ -243,7 +244,7 @@ export async function escalateTicket(actor: Actor, ticketId: string, raw: unknow
     ? await computeSlaTargets(prisma, { categorySlaProfileId: ticket.slaProfileId, teamId, priorityId: newPriority.id, start: ticket.createdAt })
     : null;
 
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     await tx.ticket.update({
       where: { id: ticket.id },
       data: {
