@@ -217,6 +217,7 @@ export async function resolveMajorIncident(actor: Actor, ticketId: string, raw: 
         tasks: { select: { isRequired: true, status: true } } },
     });
     for (const c of children) {
+      if (c.approvalStatus === "PENDING") { skipped.push({ number: c.number, reason: "awaiting approval" }); continue; }
       if (c.tasks.some((k) => k.isRequired && k.status !== "COMPLETED" && k.status !== "CANCELLED")) {
         skipped.push({ number: c.number, reason: "required tasks open" });
         continue;

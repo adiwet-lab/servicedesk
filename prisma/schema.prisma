@@ -97,6 +97,26 @@ enum MajorIncidentStatus {
   RESOLVED
 }
 
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApproverType {
+  REQUESTER_MANAGER
+  SPECIFIC_USER
+}
+
+enum ApprovalDecision {
+  WAITING
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum KbArticleType {
   FAQ
   TROUBLESHOOTING
@@ -265,6 +285,9 @@ model User {
   kbAuthored           KbArticle[]        @relation("KbAuthor")
   kbEdited             KbArticle[]        @relation("KbEditor")
   kbFeedback           KbFeedback[]
+  approvalSteps        ApprovalStep[]     @relation("ApprovalStepApprover")
+  approvalFallbacks    ApprovalStep[]     @relation("ApprovalStepFallback")
+  ticketApprovals      TicketApproval[]   @relation("TicketApprover")
 
   @@unique([tenantId, entraObjectId])
   @@index([email])
@@ -387,33 +410,34 @@ model Priority {
 
 /// Hierarchical category tree. parentId = null → Main Category; otherwise Subcategory.
 model Category {
-  id                String         @id @default(cuid())
+  id                String          @id @default(cuid())
   parentId          String?
-  parent            Category?      @relation("CategoryTree", fields: [parentId], references: [id])
-  children          Category[]     @relation("CategoryTree")
-  code              String         @unique
+  parent            Category?       @relation("CategoryTree", fields: [parentId], references: [id])
+  children          Category[]      @relation("CategoryTree")
+  code              String          @unique
   name              String
   description       String?
   defaultTeamId     String?
-  defaultTeam       SupportTeam?   @relation("CategoryDefaultTeam", fields: [defaultTeamId], references: [id])
+  defaultTeam       SupportTeam?    @relation("CategoryDefaultTeam", fields: [defaultTeamId], references: [id])
   defaultPriorityId String?
-  defaultPriority   Priority?      @relation(fields: [defaultPriorityId], references: [id])
+  defaultPriority   Priority?       @relation(fields: [defaultPriorityId], references: [id])
   slaProfileId      String?
-  slaProfile        SlaProfile?    @relation(fields: [slaProfileId], references: [id])
+  slaProfile        SlaProfile?     @relation(fields: [slaProfileId], references: [id])
   /// Array of ticket field keys that become mandatory, e.g. ["relatedAsset","contactNumber"]
-  requiredFields    Json           @default("[]")
+  requiredFields    Json            @default("[]")
   /// Reserved for Phase 2 workflow rules (e.g. auto task templates)
-  workflowRules     Json           @default("{}")
-  isActive          Boolean        @default(true)
-  sortOrder         Int            @default(0)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  workflowRules     Json            @default("{}")
+  isActive          Boolean         @default(true)
+  sortOrder         Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
   deletedAt         DateTime?
   teams             TeamCategory[]
-  mainTickets       Ticket[]       @relation("TicketCategory")
-  subTickets        Ticket[]       @relation("TicketSubcategory")
+  mainTickets       Ticket[]        @relation("TicketCategory")
+  subTickets        Ticket[]        @relation("TicketSubcategory")
   routingRules      RoutingRule[]
   kbArticles        KbArticle[]
+  approvalPolicy    ApprovalPolicy?
 
   @@index([parentId])
 }
@@ -545,6 +569,10 @@ model Ticket {
   incidentUpdates     IncidentUpdate[]
   kbArticlesFromThis  KbArticle[]            @relation("KbSource")
   kbLinks             KbArticleTicket[]
+  approvalStatus      ApprovalStatus         @default(NOT_REQUIRED)
+  approvalPolicyId    String?
+  approvalPolicy      ApprovalPolicy?        @relation(fields: [approvalPolicyId], references: [id])
+  approvals           TicketApproval[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
   deletedAt           DateTime?
@@ -981,4 +1009,57 @@ model KbFeedback {
   updatedAt DateTime  @updatedAt
 
   @@id([articleId, userId])
+}
+
+// ───────────────────────────── Approvals (Phase 6C) ─────────────────────────────
+
+/**
+ * Approval policy for a main category or subcategory (subcategory wins).
+ */
+model ApprovalPolicy {
+  id         String         @id @default(cuid())
+  name       String
+  categoryId String         @unique
+  category   Category       @relation(fields: [categoryId], references: [id])
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  steps      ApprovalStep[]
+  tickets    Ticket[]
+}
+
+model ApprovalStep {
+  id             String         @id @default(cuid())
+  policyId       String
+  policy         ApprovalPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  order          Int
+  name           String
+  approverType   ApproverType
+  approverUserId String?
+  approverUser   User?          @relation("ApprovalStepApprover", fields: [approverUserId], references: [id])
+  /// Used when the manager is missing/inactive or would approve their own request.
+  fallbackUserId String?
+  fallbackUser   User?          @relation("ApprovalStepFallback", fields: [fallbackUserId], references: [id])
+
+  @@unique([policyId, order])
+}
+
+/**
+ * Snapshot of a ticket's approval chain, resolved when the ticket is created.
+ */
+model TicketApproval {
+  id         String           @id @default(cuid())
+  ticketId   String
+  ticket     Ticket           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  stepOrder  Int
+  stepName   String
+  approverId String
+  approver   User             @relation("TicketApprover", fields: [approverId], references: [id])
+  decision   ApprovalDecision @default(WAITING)
+  comment    String?
+  decidedAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@unique([ticketId, stepOrder])
+  @@index([approverId, decision])
 }

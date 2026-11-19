@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import { canAssignTicket, canWorkTicket, messageScopeWhere, ticketScopeWhere } from "@/server/authz/scope";
 import { makeActor } from "./helpers";
 
-/** Flattens the OR branches of the visibility clause for easy assertions. */
+const APPROVER = { approvals: { some: { approverId: "u1", decision: { not: "WAITING" } } } };
+/** Flattens the OR branches of the visibility clause (minus the approver branch) for easy assertions. */
 function orBranches(where: ReturnType<typeof ticketScopeWhere>) {
   const and = (where.AND as object[]) ?? [];
-  const vis = and.find((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => "requesterId" in o || "ownerTeamId" in o || "assignedAgentId" in o) && !(c as { OR: object[] }).OR.some((o) => "isConfidential" in o)) as { OR: object[] } | undefined;
-  return vis?.OR ?? [];
+  const vis = and.find((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => "requesterId" in o || "ownerTeamId" in o || "assignedAgentId" in o || "approvals" in o) && !(c as { OR: object[] }).OR.some((o) => "isConfidential" in o)) as { OR: object[] } | undefined;
+  return (vis?.OR ?? []).filter((o) => !("approvals" in o));
+}
+function hasApproverBranch(where: ReturnType<typeof ticketScopeWhere>) {
+  return ((where.AND as object[]) ?? []).some((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => JSON.stringify(o) === JSON.stringify(APPROVER)) && !(c as { OR: object[] }).OR.some((o) => "isConfidential" in o));
 }
 function confidentialClause(where: ReturnType<typeof ticketScopeWhere>) {
   return ((where.AND as object[]) ?? []).find((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => "isConfidential" in o));
@@ -35,7 +39,7 @@ describe("ticketScopeWhere — employee visibility modes", () => {
   });
   it("employees are always subject to the confidential filter", () => {
     const w = ticketScopeWhere(makeActor("EMPLOYEE", { ticketVisibility: "OWN_DEPT" }));
-    expect(confidentialClause(w)).toEqual({ OR: [{ isConfidential: false }, { requesterId: "u1" }, { assignedAgentId: "u1" }] });
+    expect(confidentialClause(w)).toEqual({ OR: [{ isConfidential: false }, { requesterId: "u1" }, { assignedAgentId: "u1" }, APPROVER] });
   });
   it("always excludes soft-deleted tickets", () => {
     expect((ticketScopeWhere(makeActor("EMPLOYEE")).AND as object[])[0]).toEqual({ deletedAt: null });
@@ -81,10 +85,21 @@ describe("ticketScopeWhere — outsource / vendor isolation", () => {
   it("vendor never sees internal notes", () => {
     expect(messageScopeWhere(vendor)).toEqual({ deletedAt: null, type: "PUBLIC" });
   });
-  it("an actor with no read permissions matches nothing", () => {
+  it("an internal actor with no read permissions only sees tickets awaiting their approval", () => {
     const a = makeActor("EMPLOYEE");
     a.permissions = new Set();
+    const w = ticketScopeWhere(a);
+    expect(orBranches(w)).toEqual([]);
+    expect(hasApproverBranch(w)).toBe(true);
+  });
+  it("a vendor actor with no read permissions matches nothing (vendors are never approvers)", () => {
+    const a = makeActor("OUTSOURCE_SUPPORT", { tenantType: "VENDOR" });
+    a.permissions = new Set();
     expect(ticketScopeWhere(a)).toEqual({ id: { in: [] } });
+  });
+  it("approver visibility excludes steps that are not yet due", () => {
+    expect(hasApproverBranch(ticketScopeWhere(makeActor("EMPLOYEE")))).toBe(true);
+    expect(hasApproverBranch(ticketScopeWhere(makeActor("OUTSOURCE_SUPPORT", { tenantType: "VENDOR", teamIds: ["VA"] })))).toBe(false);
   });
 });
 

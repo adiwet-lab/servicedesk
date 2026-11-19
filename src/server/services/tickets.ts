@@ -26,6 +26,7 @@ import { notifyUsers, teamMemberIds } from "./notifications";
 import { getSettings } from "./settings";
 import { applyStatusChange, computeSlaTargets, recordFirstResponse, startClocks } from "./sla";
 import { normaliseCreateImpact, validateImpact } from "@/server/domain/impact";
+import { planApprovals, startApprovals } from "./approvals";
 
 // ───────────────────────────── Listing ─────────────────────────────
 
@@ -224,7 +225,7 @@ export async function getTicketDetail(actor: Actor, idOrNumber: string) {
     .filter((tr) =>
       isTransitionAllowed({
         actor, isRequester, canWork, from: ticket.status as never, to: tr.toStatus, transition: tr,
-        resolvedAt: ticket.resolvedAt, reopenWindowDays: settings["tickets.reopenWindowDays"], openRequiredTasks,
+        resolvedAt: ticket.resolvedAt, reopenWindowDays: settings["tickets.reopenWindowDays"], openRequiredTasks, approvalPending: ticket.approvalStatus === "PENDING",
       }),
     )
     .map((tr) => ({ id: tr.toStatus.id, name: tr.toStatus.name, kind: tr.toStatus.kind, color: tr.toStatus.color,
@@ -378,6 +379,9 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
     uploads = v.files;
   }
 
+  // Approval policy (subcategory first, then category) — resolved before anything is written.
+  const approvalPlan = await planApprovals(prisma, category.id, subcategory?.id ?? null, { id: requester.id, managerId: requester.managerId });
+
   const now = new Date();
   const sla = await computeSlaTargets(prisma, {
     subcategorySlaProfileId: subcategory?.slaProfileId, categorySlaProfileId: category.slaProfileId,
@@ -428,6 +432,7 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
         data: { ticketId: ticket.id, actorId: actor.id, action: "CREATED", newValue: `${number} — ${input.subject}` },
       });
       await startClocks(tx, ticket.id, sla.responseTargetMin != null);
+      if (approvalPlan) await startApprovals(tx, actor, { id: ticket.id, number, subject: input.subject }, approvalPlan, now);
       if (routing.teamId) {
         await tx.ticketAssignment.create({
           data: {
@@ -497,7 +502,7 @@ export async function changeTicketStatus(
 
   const error = validateTransition(
     { actor, isRequester, canWork, from: ticket.status, to, transition, resolvedAt: ticket.resolvedAt,
-      reopenWindowDays: settings["tickets.reopenWindowDays"], openRequiredTasks, now },
+      reopenWindowDays: settings["tickets.reopenWindowDays"], openRequiredTasks, approvalPending: ticket.approvalStatus === "PENDING", now },
     input,
   );
   if (error) {
@@ -525,6 +530,10 @@ export async function changeTicketStatus(
     // SLA: pause/resume per profile pause conditions, resolution met/breached, response met.
     Object.assign(upd, await applyStatusChange(tx, ticket, to, now));
     if (firstResponse) Object.assign(upd, await recordFirstResponse(tx, ticket, now));
+    if (to.kind === "CANCELLED" && ticket.approvalStatus === "PENDING") {
+      // Withdraw open approval requests; the ticket cannot be reopened without a new request.
+      await tx.ticketApproval.updateMany({ where: { ticketId: ticket.id, decision: { in: ["PENDING", "WAITING"] } }, data: { decision: "CANCELLED" } });
+    }
     // Optimistic concurrency: only succeeds if status unchanged since we read it.
     const res = await tx.ticket.updateMany({ where: { id: ticket.id, statusId: ticket.statusId }, data: upd as Prisma.TicketUncheckedUpdateManyInput });
     if (res.count !== 1) throw new ValidationError("The ticket was changed by someone else. Please reload and try again.");
@@ -581,7 +590,7 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
 
   // Auto-advance NEW → "Assigned" status when an agent is assigned and the workflow allows it.
   let autoStatus: { id: string; name: string; code: string; kind: StatusKind; pausesSla: boolean } | null = null;
-  if (newAgentId && ticket.status.kind === "NEW") {
+  if (newAgentId && ticket.status.kind === "NEW" && ticket.approvalStatus !== "PENDING") {
     const assigned = await prisma.ticketStatus.findFirst({ where: { code: settings["workflow.assignedStatusCode"], isActive: true } });
     if (assigned) {
       const tr = await prisma.workflowTransition.findUnique({ where: { fromStatusId_toStatusId: { fromStatusId: ticket.statusId, toStatusId: assigned.id } } });

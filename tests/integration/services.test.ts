@@ -93,7 +93,7 @@ describe("data-scope authorization", () => {
   });
   it("confidential tickets are hidden from department colleagues", async () => {
     const t = await createTicket(await actor("emma"), {
-      subject: "Salary file access issue", description: "Cannot open the payroll spreadsheet.", categoryId: await cat("REQ"), subcategoryId: await cat("REQ-ACC"), isConfidential: "on",
+      subject: "Salary file access issue", description: "Cannot open the payroll spreadsheet.", categoryId: await cat("REQ"), subcategoryId: await cat("REQ-SW"), isConfidential: "on",
     });
     await expect(getTicketDetail(await actor("ethan"), t.number)).rejects.toBeInstanceOf(NotFoundError);
     expect((await getTicketDetail(await actor("agent"), t.number)).ticket.isConfidential).toBe(true);

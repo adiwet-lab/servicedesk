@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, StatusKind } from "@prisma/client";
+import type { ApprovalStatus, Prisma, PrismaClient, StatusKind } from "@prisma/client";
 import type { BusinessCalendar, WeeklySchedule } from "@/server/domain/sla-calendar";
 import {
   addClockMinutes, businessMinutesBetween, evaluateClock, isPausedStatus, type ClockResult,
@@ -70,11 +70,14 @@ export interface TicketSlaFields {
   resolvedAt: Date | null;
   responseBreached: boolean;
   resolutionBreached: boolean;
+  /** While approval is pending the SLA stays paused regardless of status. */
+  approvalStatus?: ApprovalStatus;
 }
 
 export const ticketSlaSelect = {
   id: true, createdAt: true, slaProfileId: true, slaBusinessHours: true, slaPausedAt: true, slaPausedMinutes: true,
   responseTargetMin: true, resolutionTargetMin: true, firstResponseAt: true, resolvedAt: true, responseBreached: true, resolutionBreached: true,
+  approvalStatus: true,
 } satisfies Prisma.TicketSelect;
 
 export interface SlaContext {
@@ -124,7 +127,7 @@ export async function applyStatusChange(
 ): Promise<Prisma.TicketUncheckedUpdateInput> {
   const ctx = await slaContext(tx, t);
   const stopKinds: StatusKind[] = ["RESOLVED", "CLOSED", "CANCELLED"];
-  const shouldPause = stopKinds.includes(to.kind) || isPausedStatus(to.code, to.pausesSla, ctx.pauseCodes);
+  const shouldPause = stopKinds.includes(to.kind) || isPausedStatus(to.code, to.pausesSla, ctx.pauseCodes) || t.approvalStatus === "PENDING";
   const wasPaused = !!t.slaPausedAt;
   const data: Prisma.TicketUncheckedUpdateInput = {};
   const events: Prisma.SlaEventCreateManyInput[] = [];
@@ -150,6 +153,31 @@ export async function applyStatusChange(
   }
   if (events.length) await tx.slaEvent.createMany({ data: events });
   return data;
+}
+
+/** Pauses running clocks while a ticket waits for approval (no-op when already paused). */
+export async function pauseForApproval(tx: Prisma.TransactionClient, t: TicketSlaFields, now = new Date()): Promise<Prisma.TicketUncheckedUpdateInput> {
+  if (t.slaPausedAt) return {};
+  const clocks = (["RESPONSE", "RESOLUTION"] as const).filter((c) => (c === "RESPONSE" ? t.responseTargetMin != null && !t.firstResponseAt : t.resolutionTargetMin != null));
+  if (clocks.length) await tx.slaEvent.createMany({ data: clocks.map((clock) => ({ ticketId: t.id, clock, type: "PAUSED" as const, detail: "approval" })) });
+  return { slaPausedAt: now };
+}
+
+/**
+ * Resumes clocks after approval — unless the ticket's current status pauses (or stops)
+ * the SLA on its own, in which case the pause simply continues.
+ */
+export async function resumeAfterApproval(
+  tx: Prisma.TransactionClient, t: TicketSlaFields, status: { code: string; kind: StatusKind; pausesSla: boolean }, now = new Date(),
+): Promise<Prisma.TicketUncheckedUpdateInput> {
+  if (!t.slaPausedAt) return {};
+  const ctx = await slaContext(tx, t);
+  if (["RESOLVED", "CLOSED", "CANCELLED"].includes(status.kind) || isPausedStatus(status.code, status.pausesSla, ctx.pauseCodes)) return {};
+  const add = businessMinutesBetween(t.slaPausedAt, now, ctx.calendar);
+  const paused = t.slaPausedMinutes + add;
+  const clocks = (["RESPONSE", "RESOLUTION"] as const).filter((c) => (c === "RESPONSE" ? t.responseTargetMin != null && !t.firstResponseAt : t.resolutionTargetMin != null && !t.resolvedAt));
+  if (clocks.length) await tx.slaEvent.createMany({ data: clocks.map((clock) => ({ ticketId: t.id, clock, type: "RESUMED" as const, detail: `approval, paused ${add} min` })) });
+  return { slaPausedAt: null, slaPausedMinutes: paused, ...dueDates(t, ctx, paused) };
 }
 
 /** Response clock met (first public staff reply / first staff status change). */

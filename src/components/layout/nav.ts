@@ -1,4 +1,5 @@
 import type { Actor } from "@/server/authz/actor";
+import { isVendor } from "@/server/authz/actor";
 import { can, canAny, canAccessAdminPortal } from "@/server/authz/guards";
 import { PERMISSIONS as P, type PermissionCode } from "@/server/authz/permissions";
 import { availableViews } from "@/server/services/tickets";
@@ -20,6 +21,7 @@ export function portalNav(actor: Actor): NavSection[] {
   if (can(actor, P.TICKET_CREATE)) items.push({ label: "Create Ticket", href: "/tickets/new", icon: "plus" });
   if (views.has("my")) items.push({ label: "Messages", href: "/messages", icon: "chat", badge: "messages" });
   items.push({ label: "Help Center", href: "/help", icon: "file" });
+  if (!isVendor(actor)) items.push({ label: "My Approvals", href: "/approvals", icon: "shield" });
   items.push({ label: "Notifications", href: "/notifications", icon: "bell" }, { label: "Profile", href: "/profile", icon: "user" });
   return [{ items }];
 }
@@ -69,6 +71,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Priority", href: "/admin/config/priorities", icon: "flag", perm: P.ADMIN_CATEGORIES },
         { label: "Status", href: "/admin/config/statuses", icon: "list", perm: P.ADMIN_WORKFLOW },
         { label: "Workflow", href: "/admin/config/workflow", icon: "workflow", perm: P.ADMIN_WORKFLOW },
+        { label: "Approval Policies", href: "/admin/config/approvals", icon: "shield", perm: P.ADMIN_WORKFLOW },
         { label: "SLA Profiles", href: "/admin/config/sla", icon: "timer", perm: P.ADMIN_SLA },
         { label: "Business Hours", href: "/admin/config/business-hours", icon: "clock", perm: P.ADMIN_SLA },
         { label: "Holidays", href: "/admin/config/holidays", icon: "calendar", perm: P.ADMIN_SLA },

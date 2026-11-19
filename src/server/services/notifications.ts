@@ -24,6 +24,8 @@ export const NOTIFICATION_TYPES = {
   SLA_WARNING: "SLA warning",
   SLA_BREACHED: "SLA breached",
   MAJOR_INCIDENT: "Major incident declared / updated / resolved",
+  APPROVAL_REQUESTED: "Approval requested from me",
+  APPROVAL_DECIDED: "Approval decision on my ticket",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 

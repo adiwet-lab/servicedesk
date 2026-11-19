@@ -17,7 +17,7 @@ test.describe.serial("multi-team tasks", () => {
     await loginAs(page, "Emma Employee");
     await page.goto("/tickets/new");
     await page.getByLabel("Main category").selectOption({ label: "IT Request" });
-    await page.getByLabel("Subcategory").selectOption({ label: "New Equipment" });
+    await page.getByLabel("Subcategory").selectOption({ label: "Software Installation" });
     await page.getByLabel("Subject").fill(subject);
     await page.getByLabel("Description").fill("New starter needs a docking station and network port enabled.");
     await page.getByTestId("submit-ticket").click();

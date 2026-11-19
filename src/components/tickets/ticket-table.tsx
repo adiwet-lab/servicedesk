@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/misc";
 import { formatAging, formatDateTime } from "@/lib/utils";
 import type { TicketListRow } from "@/server/services/tickets";
 import { PriorityBadge, SlaBadge, StatusBadge } from "./badges";
+import { Badge } from "@/components/ui/badge";
 
 type Params = Record<string, string | undefined>;
 
@@ -88,7 +89,14 @@ export function TicketTable({
                   <div className="text-muted-foreground">{t.branch?.name}</div>
                 </TableCell>
                 <TableCell><PriorityBadge priority={t.priority} /></TableCell>
-                <TableCell><StatusBadge status={t.status} /></TableCell>
+                <TableCell>
+                  <div className="flex flex-col items-start gap-1">
+                    <StatusBadge status={t.status} />
+                    {t.approvalStatus === "PENDING" && <Badge variant="warning" data-testid="approval-badge">Awaiting approval</Badge>}
+                    {t.approvalStatus === "REJECTED" && <Badge variant="destructive">Not approved</Badge>}
+                    {t.isMajorIncident && t.majorIncidentStatus !== "RESOLVED" && <Badge variant="destructive">Major</Badge>}
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs whitespace-nowrap">
                   <div>{t.ownerTeam?.name ?? <span className="text-muted-foreground">Unrouted</span>}</div>
                   <div className="text-muted-foreground">{t.assignedAgent?.displayName ?? "Unassigned"}</div>

@@ -46,14 +46,19 @@ test("realtime chat between requester and agent, internal notes, attachments, un
   // Requester leaves the ticket; agent replies with an image → bell + Messages badge update live
   await emma.goto("/dashboard");
   await live(emma);
-  const bellBefore = Number((await emma.getByTestId("bell-count").textContent().catch(() => "0")) || 0);
+  // The badge caps its text at "99+"; the exact count is in data-count.
+  const bellCount = async () => Number((await emma.getByTestId("bell-count").getAttribute("data-count", { timeout: 1000 }).catch(() => "0")) || 0);
+  const bellBefore = await bellCount();
+  // Unread conversations from earlier runs may exist; compare against this run's baseline.
+  const msgCount = async () => Number((await emma.getByTestId("nav-messages-badge").textContent({ timeout: 1000 }).catch(() => "0")) || 0);
+  const msgBefore = await msgCount();
   await ana.getByTestId("chat-type-public").click();
   await ana.getByTestId("chat-input").fill("Pro is required for editing — licence assigned.");
   await ana.getByTestId("chat-file").setInputFiles({ name: "licence.png", mimeType: "image/png", buffer: PNG });
   await ana.getByTestId("chat-send").click();
-  await expect(emma.getByTestId("nav-messages-badge")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(msgCount, { timeout: 10_000 }).toBeGreaterThan(msgBefore);
   await expect(emma.getByTestId("toast").first()).toContainText(number);
-  await expect.poll(async () => Number((await emma.getByTestId("bell-count").textContent()) || 0)).toBeGreaterThan(bellBefore);
+  await expect.poll(bellCount).toBeGreaterThan(bellBefore);
 
   // Messages inbox shows the unread conversation
   await emma.goto("/messages?unread=1");
@@ -64,7 +69,7 @@ test("realtime chat between requester and agent, internal notes, attachments, un
   await expect(emma.getByTestId("chat-log")).toContainText("licence assigned");
   await expect(emma.getByTestId("chat-image")).toBeVisible();
   await expect(emma.getByTestId("chat-log")).not.toContainText("Check licence pool");
-  await expect(emma.getByTestId("nav-messages-badge")).toHaveCount(0, { timeout: 10_000 });
+  await expect.poll(msgCount, { timeout: 10_000 }).toBe(msgBefore);
   await emma.reload();
   await expect(emma.getByTestId("chat-log")).not.toContainText("Check licence pool");
 

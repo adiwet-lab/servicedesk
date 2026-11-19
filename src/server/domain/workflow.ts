@@ -29,6 +29,8 @@ export interface TransitionContext {
   resolvedAt: Date | null;
   reopenWindowDays: number;
   openRequiredTasks: number;
+  /** Approval is pending: only cancellation is possible. */
+  approvalPending?: boolean;
   now?: Date;
 }
 
@@ -44,6 +46,7 @@ export const ACTIVE_KINDS: StatusKind[] = ["NEW", "OPEN", "WAITING"];
 export function isTransitionAllowed(ctx: Omit<TransitionContext, "to"> & { to: StatusLite }): boolean {
   const { transition, actor, from } = ctx;
   if (!transition) return false;
+  if (ctx.approvalPending && ctx.to.kind !== "CANCELLED") return false;
   if (from.kind === "CLOSED" && !actor.permissions.has(P.TICKET_CLOSED_EDIT)) return false;
   if (from.kind === "CANCELLED" && !actor.permissions.has(P.TICKET_CLOSED_EDIT)) return false;
 
@@ -66,6 +69,7 @@ function requesterWindowOk(ctx: TransitionContext): boolean {
 export function validateTransition(ctx: TransitionContext, input: TransitionInput): string | null {
   if (ctx.from.id === ctx.to.id) return "The ticket is already in that status.";
   if (!ctx.transition) return `Transition from "${ctx.from.name}" to "${ctx.to.name}" is not allowed by the workflow.`;
+  if (ctx.approvalPending && ctx.to.kind !== "CANCELLED") return "This ticket is waiting for approval. Until it is approved it can only be cancelled.";
   if (!isTransitionAllowed(ctx)) {
     if (ctx.isRequester && ctx.from.kind === "RESOLVED" && ctx.transition.requesterAllowed) {
       return `The reopen window of ${ctx.reopenWindowDays} day(s) has passed. Please create a new ticket.`;

@@ -304,8 +304,23 @@ async function main() {
   }
 
   await seedKnowledgeBase();
+  await seedApprovalPolicies();
 
   console.log("✅ Seed complete.");
+}
+
+/** Manager approval for hardware, access and new-equipment requests (created only if missing). */
+async function seedApprovalPolicies() {
+  console.log("Seeding approval policies…");
+  const fallback = await prisma.user.findFirst({ where: { email: "sys.admin@contoso.example" } });
+  for (const [code, name] of [["REQ-HW", "Hardware request approval"], ["REQ-ACC", "Access request approval"], ["REQ-NEW", "New equipment approval"]] as const) {
+    const category = await prisma.category.findUnique({ where: { code } });
+    if (!category || (await prisma.approvalPolicy.findUnique({ where: { categoryId: category.id } }))) continue;
+    await prisma.approvalPolicy.create({
+      data: { name, categoryId: category.id, isActive: true,
+        steps: { create: [{ order: 1, name: "Line manager approval", approverType: "REQUESTER_MANAGER", fallbackUserId: fallback?.id ?? null }] } },
+    });
+  }
 }
 
 /** Starter knowledge articles (idempotent by title). Numbers come from the KB sequence. */

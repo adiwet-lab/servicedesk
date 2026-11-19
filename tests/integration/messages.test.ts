@@ -26,7 +26,7 @@ let ticket: { id: string; number: string };
 beforeAll(async () => {
   ticket = await createTicket(await actor("emma"), {
     subject: "Outlook keeps asking for password", description: "Outlook prompts for credentials every 10 minutes.",
-    categoryId: await id.cat("REQ"), subcategoryId: await id.cat("REQ-ACC"),
+    categoryId: await id.cat("REQ"), subcategoryId: await id.cat("REQ-SW"),
   });
   const lee = await actor("lead");
   const ana = await actor("agent");

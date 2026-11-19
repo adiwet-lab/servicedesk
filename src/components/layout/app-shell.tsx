@@ -129,7 +129,7 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
             </button>
             <Link href="/notifications" className="relative rounded-md p-2 hover:bg-accent" aria-label={`Notifications (${unread} unread)`}>
               <Bell className="size-4" />
-              {unread > 0 && <span data-testid="bell-count" className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}
+              {unread > 0 && <span data-testid="bell-count" data-count={unread} className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger className="ml-1 flex items-center gap-2 rounded-md p-1 pr-2 hover:bg-accent outline-none" data-testid="user-menu">

@@ -16,12 +16,15 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: { baseURL: `http://localhost:${PORT}`, trace: "off", screenshot: "only-on-failure" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "warmup", testMatch: /warmup\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["warmup"] },
+  ],
   webServer: {
     command: "pnpm dev",
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: true,
     timeout: 120_000,
-    env: { AUTH_DEV_LOGIN: "true", PORT: String(PORT), APP_URL: `http://localhost:${PORT}`, NODE_OPTIONS: "--max-old-space-size=4096" },
+    env: { AUTH_DEV_LOGIN: "true", PORT: String(PORT), APP_URL: `http://localhost:${PORT}`, NODE_OPTIONS: "--max-old-space-size=6144" },
   },
 });

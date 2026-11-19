@@ -54,6 +54,9 @@ export function ticketScopeWhere(actor: Actor): Prisma.TicketWhereInput {
       or.push({ tasks: { some: { assignedAgentId: actor.id } } });
     }
 
+    // Approvers see the tickets awaiting (or decided by) them.
+    if (!vendor) or.push({ approvals: { some: { approverId: actor.id, decision: { not: "WAITING" } } } });
+
     if (or.length === 0) return MATCH_NOTHING;
     and.push({ OR: or });
   }
@@ -63,6 +66,7 @@ export function ticketScopeWhere(actor: Actor): Prisma.TicketWhereInput {
       { isConfidential: false },
       { requesterId: actor.id },
       { assignedAgentId: actor.id },
+      { approvals: { some: { approverId: actor.id, decision: { not: "WAITING" } } } },
     ];
     if (perms.has(P.TICKET_READ_TEAM) && actor.teamIds.length > 0) {
       conf.push({ ownerTeamId: { in: actor.teamIds } });
