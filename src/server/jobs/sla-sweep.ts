@@ -1,3 +1,5 @@
+import { acquireLease, releaseLease } from "./lease";
+import { enqueueTeamsCard } from "@/server/integrations/teams";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma as defaultDb } from "@/server/db";
@@ -22,26 +24,8 @@ export interface SweepResult {
 
 const LEASE_KEY = "jobs.slaSweep.lease";
 
-/**
- * Lease so only one app instance sweeps at a time (multi-replica safe).
- * Atomic: inserts or takes over an expired lease in a single statement.
- */
-async function acquireLease(db: PrismaClient, holder: string, ttlMs: number): Promise<boolean> {
-  const until = new Date(Date.now() + ttlMs).toISOString();
-  const value = JSON.stringify({ holder, until });
-  const rows = await db.$queryRaw<{ key: string }[]>`
-    INSERT INTO "SystemSetting" ("key", "value", "updatedAt") VALUES (${LEASE_KEY}, ${value}::jsonb, NOW())
-    ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updatedAt" = NOW()
-      WHERE ("SystemSetting"."value"->>'until')::timestamptz < NOW()
-    RETURNING "key"`;
-  return rows.length === 1;
-}
-
-async function releaseLease(db: PrismaClient, holder: string) {
-  await db.$executeRaw`
-    UPDATE "SystemSetting" SET "value" = jsonb_set("value", '{until}', to_jsonb(NOW()::text)), "updatedAt" = NOW()
-     WHERE "key" = ${LEASE_KEY} AND "value"->>'holder' = ${holder}`;
-}
+const acquire = (db: PrismaClient, holder: string, ttlMs: number) => acquireLease(db, LEASE_KEY, holder, ttlMs);
+const release = (db: PrismaClient, holder: string) => releaseLease(db, LEASE_KEY, holder);
 
 async function recipientsFor(tx: Prisma.TransactionClient, t: { assignedAgentId: string | null; ownerTeamId: string | null }) {
   const base = t.assignedAgentId ? [t.assignedAgentId] : await teamMemberIds(tx, t.ownerTeamId);
@@ -58,7 +42,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
   const started = Date.now();
   const r: SweepResult = { skipped: false, backfilled: 0, warnings: 0, breaches: 0, escalations: 0, tasksOverdue: 0, autoClosed: 0, errors: 0, durationMs: 0 };
   const holder = randomUUID();
-  if (!(await acquireLease(db, holder, 5 * 60_000))) return { ...r, skipped: true, durationMs: Date.now() - started };
+  if (!(await acquire(db, holder, 5 * 60_000))) return { ...r, skipped: true, durationMs: Date.now() - started };
 
   const safely = async (fn: () => Promise<void>) => {
     try {
@@ -125,6 +109,8 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
               await notifyUsers(tx, await recipientsFor(tx, t), {
                 type: "SLA_BREACHED", title: `SLA breached (${label}): ${t.number}`, body: t.subject, ticketId: t.id, link,
               });
+              await enqueueTeamsCard(tx, { teamId: t.ownerTeamId, event: "SLA_BREACHED", ticketId: t.id, title: `SLA breached (${label}): ${t.number}`,
+                extraFacts: [["Due", c.dueAt?.toISOString().slice(0, 16).replace("T", " ") + " UTC"]], tone: "attention" });
             });
             r.breaches++;
           } else if (c.state === "WARNING" && !has(clock, "WARNING") && !has(clock, "BREACHED")) {
@@ -227,7 +213,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
       }
     }
   } finally {
-    await releaseLease(db, holder).catch(() => {});
+    await release(db, holder).catch(() => {});
   }
   r.durationMs = Date.now() - started;
   return r;

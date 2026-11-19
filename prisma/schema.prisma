@@ -117,6 +117,13 @@ enum ApprovalDecision {
   CANCELLED
 }
 
+enum OutboxStatus {
+  PENDING
+  SENT
+  FAILED
+  DEAD
+}
+
 enum KbArticleType {
   FAQ
   TROUBLESHOOTING
@@ -145,21 +152,25 @@ enum ImpactScope {
 // ─────────────────────── Identity & Organization ───────────────────────
 
 model Tenant {
-  id                 String        @id @default(cuid())
-  entraTenantId      String        @unique // Microsoft Entra "tid" (GUID)
-  name               String
-  type               TenantType    @default(INTERNAL)
-  primaryDomain      String? // informational only; never used for authorization
-  companyId          String?
-  company            Company?      @relation(fields: [companyId], references: [id])
-  isActive           Boolean       @default(true)
-  autoProvisionUsers Boolean       @default(false)
-  defaultRoleId      String?
-  defaultRole        Role?         @relation(fields: [defaultRoleId], references: [id])
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  users              User[]
-  supportTeams       SupportTeam[]
+  id                  String        @id @default(cuid())
+  entraTenantId       String        @unique // Microsoft Entra "tid" (GUID)
+  name                String
+  type                TenantType    @default(INTERNAL)
+  primaryDomain       String? // informational only; never used for authorization
+  companyId           String?
+  company             Company?      @relation(fields: [companyId], references: [id])
+  isActive            Boolean       @default(true)
+  autoProvisionUsers  Boolean       @default(false)
+  /// Microsoft Graph directory sync (app-only, User.Read.All).
+  graphSyncEnabled    Boolean       @default(false)
+  lastGraphSyncAt     DateTime?
+  lastGraphSyncResult Json?
+  defaultRoleId       String?
+  defaultRole         Role?         @relation(fields: [defaultRoleId], references: [id])
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  users               User[]
+  supportTeams        SupportTeam[]
 }
 
 model Company {
@@ -288,6 +299,7 @@ model User {
   approvalSteps        ApprovalStep[]     @relation("ApprovalStepApprover")
   approvalFallbacks    ApprovalStep[]     @relation("ApprovalStepFallback")
   ticketApprovals      TicketApproval[]   @relation("TicketApprover")
+  apiTokens            ApiToken[]         @relation("ApiTokenCreator")
 
   @@unique([tenantId, entraObjectId])
   @@index([email])
@@ -340,34 +352,36 @@ model UserRole {
 // ─────────────────────────── Support Teams ───────────────────────────
 
 model SupportTeam {
-  id           String                 @id @default(cuid())
-  code         String                 @unique
-  name         String
-  description  String?
-  type         TeamType               @default(INTERNAL)
-  companyId    String?
-  company      Company?               @relation(fields: [companyId], references: [id])
-  tenantId     String?
-  tenant       Tenant?                @relation(fields: [tenantId], references: [id])
-  leadId       String?
-  lead         User?                  @relation("TeamLead", fields: [leadId], references: [id])
-  slaProfileId String?
-  slaProfile   SlaProfile?            @relation(fields: [slaProfileId], references: [id])
-  isActive     Boolean                @default(true)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  deletedAt    DateTime?
-  members      TeamMember[]
-  categories   TeamCategory[]
-  defaultFor   Category[]             @relation("CategoryDefaultTeam")
-  ownedTickets Ticket[]               @relation("TicketOwnerTeam")
-  supporting   TicketSupportingTeam[]
-  tasks        TicketTask[]
-  routingRules RoutingRule[]
-  prevAssign   TicketAssignment[]     @relation("AssignmentPrevTeam")
-  newAssign    TicketAssignment[]     @relation("AssignmentNewTeam")
-  taskAssign   TaskAssignment[]
-  escalations  EscalationRule[]
+  id              String                 @id @default(cuid())
+  code            String                 @unique
+  name            String
+  description     String?
+  type            TeamType               @default(INTERNAL)
+  companyId       String?
+  company         Company?               @relation(fields: [companyId], references: [id])
+  tenantId        String?
+  tenant          Tenant?                @relation(fields: [tenantId], references: [id])
+  leadId          String?
+  lead            User?                  @relation("TeamLead", fields: [leadId], references: [id])
+  slaProfileId    String?
+  slaProfile      SlaProfile?            @relation(fields: [slaProfileId], references: [id])
+  /// Teams incoming-webhook / Workflows URL, AES-GCM encrypted at rest.
+  teamsWebhookEnc String?
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  deletedAt       DateTime?
+  members         TeamMember[]
+  categories      TeamCategory[]
+  defaultFor      Category[]             @relation("CategoryDefaultTeam")
+  ownedTickets    Ticket[]               @relation("TicketOwnerTeam")
+  supporting      TicketSupportingTeam[]
+  tasks           TicketTask[]
+  routingRules    RoutingRule[]
+  prevAssign      TicketAssignment[]     @relation("AssignmentPrevTeam")
+  newAssign       TicketAssignment[]     @relation("AssignmentNewTeam")
+  taskAssign      TaskAssignment[]
+  escalations     EscalationRule[]
 }
 
 model TeamMember {
@@ -1062,4 +1076,47 @@ model TicketApproval {
 
   @@unique([ticketId, stepOrder])
   @@index([approverId, decision])
+}
+
+// ───────────────────────────── Integrations (Phase 6D) ─────────────────────────────
+
+/**
+ * Asynchronous outbound deliveries (Teams cards …) with retry/backoff; also the delivery log.
+ */
+model IntegrationOutbox {
+  id            String       @id @default(cuid())
+  channel       String // "teams"
+  event         String // e.g. TICKET_CREATED
+  /// Logical destination (e.g. "team:<id>") — the secret URL is resolved at send time.
+  target        String
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  nextAttemptAt DateTime     @default(now())
+  lastError     String?
+  ticketId      String?
+  createdAt     DateTime     @default(now())
+  sentAt        DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
+}
+
+/**
+ * Bearer tokens for read-only reporting feeds (Power BI). Only the SHA-256 hash is stored.
+ */
+model ApiToken {
+  id           String    @id @default(cuid())
+  name         String
+  tokenHash    String    @unique
+  /// First characters of the token, shown to identify it.
+  prefix       String
+  scopes       String[]
+  includeNames Boolean   @default(false)
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  createdById  String
+  createdBy    User      @relation("ApiTokenCreator", fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now())
 }

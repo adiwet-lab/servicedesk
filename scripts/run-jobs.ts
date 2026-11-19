@@ -1,12 +1,19 @@
-/** One-shot SLA & housekeeping sweep: `pnpm jobs:run` (cron / Azure Container Apps Job). */
+/** One-shot jobs run: SLA sweep, integration outbox, due directory syncs — `pnpm jobs:run` (cron / Azure Container Apps Job). */
 import { prisma } from "@/server/db";
 import { runSlaSweep } from "@/server/jobs/sla-sweep";
+import { processOutbox } from "@/server/integrations/outbox";
+import { runDueGraphSyncs } from "@/server/integrations/graph";
+import { getSetting } from "@/server/services/settings";
 
-runSlaSweep()
-  .then((r) => {
-    console.log(JSON.stringify(r));
-    process.exitCode = r.errors > 0 ? 1 : 0;
-  })
+async function main() {
+  const sla = await runSlaSweep();
+  const outbox = await processOutbox();
+  const graph = await runDueGraphSyncs(await getSetting(prisma, "integrations.graph.syncIntervalHours"));
+  console.log(JSON.stringify({ sla, outbox, graph }));
+  process.exitCode = sla.errors > 0 ? 1 : 0;
+}
+
+main()
   .catch((e) => {
     console.error(e);
     process.exitCode = 1;

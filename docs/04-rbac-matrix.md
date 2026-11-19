@@ -27,6 +27,11 @@ Authorization = **permission** (what) × **data scope** (which rows). Both are e
 | `task.assign` — Assign tasks to teams/agents |  |  | ✓ | ✓ |  |  | ✓ |
 | `dashboard.support` — Support / team dashboards and admin portal access |  | ✓ | ✓ | ✓ |  | ✓ | ✓ |
 | `dashboard.management` ✱ — Management dashboards across all tickets |  |  |  | ✓ | ✓ |  | ✓ |
+| `report.export` — Run reports and export CSV (within own data scope) |  |  | ✓ | ✓ | ✓ |  | ✓ |
+| `incident.manage` ✱ — Declare and manage major incidents (updates, linking, resolution) |  |  | ✓ | ✓ |  |  | ✓ |
+| `kb.write` ✱ — Create and edit knowledge articles (drafts) |  | ✓ | ✓ | ✓ |  |  | ✓ |
+| `kb.publish` ✱ — Publish and archive knowledge articles |  |  | ✓ | ✓ |  |  | ✓ |
+| `integrations.manage` ✱ — Manage integrations (Microsoft Graph, Teams, assets, Power BI tokens) |  |  |  | ✓ |  |  | ✓ |
 | `admin.categories` ✱ — Manage categories, priorities and routing |  |  |  | ✓ |  |  | ✓ |
 | `admin.workflow` ✱ — Manage statuses and workflow transitions |  |  |  | ✓ |  |  | ✓ |
 | `admin.sla` ✱ — Manage SLA, business hours, holidays |  |  |  | ✓ |  |  | ✓ |
@@ -48,6 +53,7 @@ Authorization = **permission** (what) × **data scope** (which rows). Both are e
 | … + user visibility `OWN_DEPT` / `OWN_BRANCH` / `OWN_DEPT_BRANCH` (internal only) | same department / branch as me |
 | `ticket.read.team` | owner team ∈ my teams, or a supporting team ∈ my teams, or a task's team ∈ my teams |
 | support staff | I am the assigned agent of the ticket or one of its tasks |
+| approver (internal only) | I hold an approval step on the ticket that is due or decided (not future steps) |
 
 **Confidential tickets** (unless `ticket.confidential.read` and internal): only requester, assigned agent and owner-team members.
 
@@ -74,6 +80,15 @@ Authorization = **permission** (what) × **data scope** (which rows). Both are e
 | Dashboards | `dashboard.support` (scoped to own teams/tickets) or `dashboard.management` / `ticket.read.all` (organisation-wide, internal only). Drill-down links only for users who can read tickets |
 | Reports & CSV export | `report.export` (Team Lead, System Admin, Dashboard Viewer, Super Admin by default); always within the user's data scope; audited (`REPORT_EXPORTED`) |
 | Internal notes | read `note.internal.read`, write `note.internal.write`; internal tenants only; filtered in every query (`messageScopeWhere`) incl. search, inbox previews, unread counts, attachment downloads and realtime rooms |
+
+| Impact (scope, branches, users) | can work the ticket (internal only) |
+| Major incident: declare / update / link / resolve | `incident.manage` + can work the ticket or read.all; never confidential tickets; children cannot be incidents |
+| "I'm affected too" | `ticket.create` + my branch/company is impacted; one report per incident |
+| Knowledge articles | read: published + employees (employees/vendors), + support-only (internal staff); `kb.write` drafts & edits drafts; `kb.publish` publishes/archives and edits published |
+| Approve / reject | only the approver of the current (pending) step; reject needs a comment; vendors never approve |
+| Approval policies | `admin.workflow` |
+| Integrations & Power BI tokens | `integrations.manage` (internal only) |
+| Asset lookup | any signed-in user (rate-limited); serial, holder and location only for internal support staff |
 
 ## Role intent
 | Role | Typical user | Portal |

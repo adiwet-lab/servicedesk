@@ -26,6 +26,7 @@ import { PriorityBadge, StatusBadge } from "./badges";
 import { SlaCard } from "./sla-card";
 import { IncidentPanel } from "@/components/incidents/incident-panel";
 import { ApprovalCard } from "@/components/approvals/approval-card";
+import { AssetCard } from "./asset-card";
 import { CreateFromTicketButton } from "@/components/kb/kb-client";
 import { canWriteKb, relatedArticlesForTicket } from "@/server/services/kb";
 import { AssignDialog, AttachmentUploader, StatusChanger } from "./ticket-actions";
@@ -204,6 +205,7 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
             </Card>
           )}
           <SlaCard ticketId={t.id} />
+          <AssetCard actor={actor} ticketId={t.id} tag={t.relatedAsset} ticketBase={backHref} staff={perm.canWork || actor.teamIds.length > 0} />
           <Card>
             <CardHeader><CardTitle className="text-base">Requester</CardTitle></CardHeader>
             <CardContent className="space-y-3">

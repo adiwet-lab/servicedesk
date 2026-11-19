@@ -81,3 +81,9 @@ Browser ──socket.io (same origin, session cookie)──▶ server.ts ── 
 - Cohorts: volume = tickets **created** in the period (current status); compliance & average times = tickets **resolved** in the period; aging, workload and open-ticket SLA states = **current backlog**.
 - Reports (`services/reports.ts`, `GET /api/reports/[type]`) reuse the same filters/scope, require `report.export`, cap at 50k rows, write UTF-8 BOM CSV with formula-injection escaping, and are audited.
 - For very large datasets, Phase 6 adds a Power BI dataset / snapshot tables; Phase 5 queries live data.
+
+## Advanced features & integrations (Phase 6)
+- Services: `incidents.ts`, `kb.ts`, `approvals.ts`; pure rules in `domain/impact.ts`, `domain/approvals.ts`, `lib/markdown.ts`.
+- `src/server/integrations/`: `crypto.ts` (AES-GCM secrets, token hashing, pseudonyms) · `ssrf.ts` (outbound allow-list) · `http.ts` (timeouts, no redirects, size cap, Retry-After) · `outbox.ts` · `teams.ts` · `graph.ts` · `assets.ts` (AssetProvider: demo / REST) · `bi.ts`.
+- Job runner tick = SLA sweep → outbox delivery → due Graph syncs (each behind its own database lease). `pnpm jobs:run` runs all three once.
+- Power BI feeds are plain route handlers (`/api/bi/v1/[feed]`) authenticated by bearer token, excluded from the session middleware.

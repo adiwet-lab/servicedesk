@@ -104,6 +104,7 @@ export function adminNav(actor: Actor): NavSection[] {
         { label: "Permissions", href: "/admin/system/permissions", icon: "key", perm: [P.ADMIN_ROLES, P.ADMIN_USERS] },
         { label: "Microsoft Tenants", href: "/admin/system/tenants", icon: "cloud", perm: P.ADMIN_TENANTS },
         { label: "Notification Settings", href: "/admin/system/notifications", icon: "bell", perm: P.ADMIN_SETTINGS },
+        { label: "Integrations", href: "/admin/integrations", icon: "external", perm: P.INTEGRATIONS_MANAGE },
         { label: "Audit Logs", href: "/admin/system/audit", icon: "file", perm: P.AUDIT_READ },
         { label: "System Settings", href: "/admin/system/settings", icon: "settings", perm: P.ADMIN_SETTINGS },
       ],

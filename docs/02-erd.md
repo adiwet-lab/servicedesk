@@ -80,6 +80,14 @@ erDiagram
 | Auto-assignment | `RoutingRule` |
 | Configurable numbering / settings | `NumberSequence`, `SystemSetting` |
 
+### Phase 6 tables
+| Requirement | Tables / fields |
+|---|---|
+| Major incident, branch impact | `Ticket.isMajorIncident/majorIncidentStatus/majorDeclaredAt/majorDeclaredById/impactScope/impactedUserCount/parentIncidentId`, `TicketImpactedBranch`, `IncidentUpdate` |
+| Knowledge base | `KbArticle` (GIN FTS index), `KbArticleTicket`, `KbFeedback` (PK article+user), sequence `KB` |
+| Approvals | `ApprovalPolicy` (unique category), `ApprovalStep`, `TicketApproval` (unique ticket+step), `Ticket.approvalStatus/approvalPolicyId` |
+| Integrations | `IntegrationOutbox`, `ApiToken` (unique hash), `Tenant.graphSyncEnabled/lastGraphSyncAt/lastGraphSyncResult`, `SupportTeam.teamsWebhookEnc`, settings `integrations.*` |
+
 ## Key constraints & conventions
 - **Identity**: `User @@unique([tenantId, entraObjectId])`; `Tenant.entraTenantId` unique. Email is *not* unique and not an identity key.
 - **Codes** unique on `Company`, `SupportTeam`, `Category`, `Priority`, `TicketStatus`, `Role`, `Permission`; scoped-unique on `Department/Branch (companyId, code)`, `Location (branchId, code)`.

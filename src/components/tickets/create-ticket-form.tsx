@@ -8,6 +8,7 @@ import { Alert, Field } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ImpactFields } from "@/components/incidents/incident-forms";
 import { SuggestedArticles } from "@/components/kb/kb-client";
+import { AssetInput } from "./asset-check";
 
 interface Cat { id: string; name: string; requiredFields: string[]; defaultPriorityId: string | null }
 interface Props {
@@ -75,7 +76,7 @@ export function CreateTicketForm(p: Props) {
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Related asset" htmlFor="relatedAsset" required={required.has("relatedAsset")} error={fe.relatedAsset} hint="Asset tag / serial number">
-              <Input id="relatedAsset" name="relatedAsset" maxLength={100} required={required.has("relatedAsset")} aria-invalid={!!fe.relatedAsset} />
+              <AssetInput required={required.has("relatedAsset")} invalid={!!fe.relatedAsset} />
             </Field>
             <Field label="Affected system" htmlFor="affectedSystem" required={required.has("affectedSystem")} error={fe.affectedSystem}>
               <Input id="affectedSystem" name="affectedSystem" maxLength={200} required={required.has("affectedSystem")} aria-invalid={!!fe.affectedSystem} />

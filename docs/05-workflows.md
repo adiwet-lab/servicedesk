@@ -148,3 +148,28 @@ Ops: "Run SLA check now" on the SLA Profiles page; `pnpm jobs:run` for external 
 Filters (URL state, shared by all dashboards and reports): date range presets / custom, company, department, branch, team, category, subcategory, priority, status, agent. Rows in tables link to the filtered ticket list (drill-down), where the dashboard filters appear as removable chips.
 
 Reports: ticket detail, SLA compliance, agent performance, team performance, category summary — preview (50 rows) and CSV export.
+
+## Major incidents & branch impact (Phase 6A)
+- **Impact** (any staff who can work the ticket, also selectable on create): scope `Single user | Single branch | Multiple branches | Company-wide | Multiple companies`, impacted branches (single = exactly 1, multiple = ≥ 2; single-branch on create defaults to the ticket branch), approximate affected users. History + audit.
+- **Declare** (`incident.manage`): requires impact; not for confidential tickets, linked children or closed tickets. Sets status *Investigating* and posts the first communication. Notifies owner/supporting teams, leads, requesters; Teams card.
+- **Updates**: *Investigating → Identified → Monitoring* with a public message — the communication log; requesters of the incident and every linked ticket are notified.
+- **Linking**: child tickets link to one active incident; a major incident or a ticket with children cannot become a child (no cycles).
+- **Resolve**: final *Resolved* update; optional cascade resolves each active child where (a) a workflow transition to a Resolved-kind status exists from its current status, (b) no required task is open, (c) no approval is pending. Skipped children are reported with the reason.
+- **Known-issues banner**: employees whose branch (or company, for company-wide) is impacted see subject, status and the latest update; *I'm affected too* creates one linked child ticket per user.
+
+## Knowledge base (Phase 6B)
+`DRAFT → PUBLISHED → ARCHIVED (→ DRAFT)`. Writers (`kb.write`) create and edit drafts; publishers (`kb.publish`) publish/archive and edit published articles (optimistic version check, audited change note). *Create knowledge article* on a resolved/closed (non-confidential) ticket drafts a support-only Troubleshooting article (Symptoms / Solution) linked to the ticket. Search = PostgreSQL full text (`simple`, GIN) OR substring match (Thai, partial words); title hits rank first. The create-ticket form suggests articles as the subject is typed; *This solved my problem* records a helpful vote + `KB_DEFLECTED` audit without creating a ticket.
+
+## Approval workflow (Phase 6C)
+1. On create, the **subcategory policy wins over the main-category policy**. Each step's approver: the requester's manager or a specific user; a fallback approver is used when the manager is missing/inactive or would be the requester. No resolvable approver → the ticket is not created (clear message).
+2. The chain is snapshotted (`TicketApproval`): step 1 *Pending*, later steps *Waiting*. `approvalStatus = PENDING`; SLA clocks pause (event detail `approval`).
+3. While pending: only cancellation is possible (cancelling withdraws the requests); assignment and chat stay available; no automatic status moves; no SLA resume from any path.
+4. **Approve** → next step becomes Pending (approver notified) or the ticket is *Approved*: SLA resumes (paused time added, unless the current status itself pauses), owner team + requester notified.
+5. **Reject** (comment required) → *Rejected*; the ticket moves to a Cancelled-kind status if the workflow has that transition; requester + staff notified.
+Seeded: Hardware Request, Access Request, New Equipment → line manager (fallback: System Admin).
+
+## Integrations (Phase 6D)
+- **Outbox**: Teams cards are written in the same transaction as the business change, then delivered by the job runner (lease-protected). Retries: 1, 2, 4, 8, 16 min (or Retry-After), max 6 attempts; 4xx (except 408/429) is permanent. Admins can retry from the delivery log.
+- **Teams events** (configurable): new ticket for a team, transfer to a team, SLA breach, major incident declared/updated/resolved.
+- **Graph sync**: per tenant, every *N* hours (default 24) or *Sync now*; see the security register for the rules.
+- **Power BI**: `GET /api/bi/v1/{tickets|tasks|sla-events|teams|categories|priorities|statuses|branches|departments}`; `$top` ≤ 5000, `$skip`, `modifiedSince`; `@odata.nextLink` for paging.

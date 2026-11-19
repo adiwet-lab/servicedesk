@@ -13,6 +13,16 @@ import { audit } from "./audit";
 import { notifyUsers, teamMemberIds } from "./notifications";
 import { applyStatusChange, ticketSlaSelect } from "./sla";
 import { createTicket } from "./tickets";
+import { enqueueTeamsCard } from "@/server/integrations/teams";
+
+/** Teams card for the owner team and every supporting team of an incident. */
+async function incidentCard(tx: Prisma.TransactionClient, ticketId: string, title: string, text: string, tone: "attention" | "warning" | "good") {
+  const t = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId }, select: { ownerTeamId: true, supportingTeams: { select: { teamId: true } }, impactScope: true, _count: { select: { childTickets: true } } } });
+  for (const teamId of new Set([t.ownerTeamId, ...t.supportingTeams.map((s) => s.teamId)])) {
+    await enqueueTeamsCard(tx, { teamId, event: "MAJOR_INCIDENT", ticketId, title, text, tone,
+      extraFacts: [["Impact", t.impactScope ? IMPACT_LABEL[t.impactScope] : null], ["Linked tickets", String(t._count.childTickets)]] });
+  }
+}
 
 export { IMPACT_LABEL, validateImpact };
 export const MI_STATUS_LABEL: Record<MajorIncidentStatus, string> = {
@@ -120,6 +130,7 @@ export async function declareMajorIncident(actor: Actor, ticketId: string, raw: 
     await notifyUsers(tx, aud.requesters, {
       type: "MAJOR_INCIDENT", title: `Known issue: ${t.subject}`, body: message.slice(0, 160), ticketId: t.id, link: `/tickets/${t.number}`,
     }, actor);
+    await incidentCard(tx, t.id, `🚨 Major incident declared: ${t.number}`, message, "attention");
   });
 }
 
@@ -144,6 +155,7 @@ export async function postIncidentUpdate(actor: Actor, ticketId: string, raw: un
     const aud = await incidentAudience(tx, t.id);
     await notifyUsers(tx, aud.staff, { type: "MAJOR_INCIDENT", title: `${t.number} · ${MI_STATUS_LABEL[u.status]}`, body: u.message.slice(0, 160), ticketId: t.id, link: `/admin/tickets/${t.number}` }, actor);
     await notifyUsers(tx, aud.requesters, { type: "MAJOR_INCIDENT", title: `Update: ${t.subject} (${MI_STATUS_LABEL[u.status]})`, body: u.message.slice(0, 160), ticketId: t.id }, actor);
+    await incidentCard(tx, t.id, `Major incident ${t.number}: ${MI_STATUS_LABEL[u.status]}`, u.message, "warning");
   });
 }
 
@@ -208,6 +220,7 @@ export async function resolveMajorIncident(actor: Actor, ticketId: string, raw: 
     await audit(tx, actor, { action: "MAJOR_INCIDENT_RESOLVED", entityType: "Ticket", entityId: t.id, ticketId: t.id, newValue: { summary, cascade } });
     const aud = await incidentAudience(tx, t.id);
     await notifyUsers(tx, [...aud.staff, ...aud.requesters], { type: "MAJOR_INCIDENT", title: `Resolved: ${t.subject}`, body: summary.slice(0, 160), ticketId: t.id }, actor);
+    await incidentCard(tx, t.id, `✅ Major incident resolved: ${t.number}`, summary, "good");
   });
 
   if (cascade) {

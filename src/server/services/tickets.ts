@@ -27,6 +27,7 @@ import { getSettings } from "./settings";
 import { applyStatusChange, computeSlaTargets, recordFirstResponse, startClocks } from "./sla";
 import { normaliseCreateImpact, validateImpact } from "@/server/domain/impact";
 import { planApprovals, startApprovals } from "./approvals";
+import { enqueueTeamsCard } from "@/server/integrations/teams";
 
 // ───────────────────────────── Listing ─────────────────────────────
 
@@ -459,6 +460,8 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
           newValue: stored.map((s) => s.f.safeName) });
       }
 
+      await enqueueTeamsCard(tx, { teamId: routing.teamId, event: "TICKET_CREATED", ticketId: ticket.id, title: `New ticket ${number}`,
+        extraFacts: [["Category", `${category.name}${subcategory ? ` › ${subcategory.name}` : ""}`], ["Requester", requester.displayName]], tone: "accent" });
       const link = `/tickets/${number}`;
       const teamUsers = routing.agentId ? [routing.agentId] : await teamMemberIds(tx, routing.teamId);
       await notifyUsers(tx, teamUsers, { type: "TICKET_CREATED", title: `New ticket ${number}`, body: input.subject, ticketId: ticket.id, link }, actor);
@@ -644,6 +647,8 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
     if (teamChanged) {
       await notifyUsers(tx, await teamMemberIds(tx, newTeamId), { type: "TICKET_TRANSFERRED",
         title: `${ticket.number} transferred to ${team.name}`, body: input.reason, ticketId: ticket.id, link }, actor);
+      await enqueueTeamsCard(tx, { teamId: newTeamId, event: "TICKET_TRANSFERRED", ticketId: ticket.id, title: `${ticket.number} transferred to ${team.name}`,
+        extraFacts: [["Reason", input.reason]], tone: "accent" });
     }
     await notifyUsers(tx, [ticket.requesterId], { type: "TICKET_ASSIGNED", title: `${ticket.number} has been assigned`,
       body: ticket.subject, ticketId: ticket.id, link }, actor);

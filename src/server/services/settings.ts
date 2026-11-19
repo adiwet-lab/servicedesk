@@ -19,6 +19,23 @@ export const SETTINGS_SCHEMA = {
   "workflow.requesterReplyStatusCode": z.string().default("IN_PROGRESS"),
   /** Notification types switched off by administrators (in-app channel). */
   "notifications.disabledTypes": z.array(z.string()).default([]),
+  /** Events posted as Adaptive Cards to a support team's Microsoft Teams channel (if it has a webhook). */
+  "integrations.teams.events": z.array(z.string()).default(["TICKET_CREATED", "TICKET_TRANSFERRED", "SLA_BREACHED", "MAJOR_INCIDENT"]),
+  /** IT asset lookup. Secret API key is stored separately (encrypted). */
+  "integrations.assets": z.object({
+    provider: z.enum(["none", "demo", "rest"]).default("demo"),
+    baseUrl: z.string().max(500).default(""),
+    /** Path template; {tag} is URL-encoded. Snipe-IT default. */
+    lookupPath: z.string().max(300).default("/api/v1/hardware/bytag/{tag}"),
+    /** Dot-paths into the provider's JSON for each field. */
+    mapping: z.record(z.string(), z.string().max(200)).default({
+      tag: "asset_tag", name: "name", model: "model.name", serial: "serial", status: "status_label.name",
+      assignedTo: "assigned_to.name", location: "location.name", warrantyExpires: "warranty_expires.date",
+    }),
+  }).default({}),
+  "integrations.assets.apiKeyEnc": z.string().default(""),
+  /** Hours between automatic Microsoft Graph directory syncs (0 = manual only). */
+  "integrations.graph.syncIntervalHours": z.number().int().min(0).max(168).default(24),
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS_SCHEMA;

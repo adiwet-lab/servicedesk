@@ -1,4 +1,8 @@
 import { runSlaSweep, type SweepResult } from "./sla-sweep";
+import { prisma } from "@/server/db";
+import { processOutbox } from "@/server/integrations/outbox";
+import { runDueGraphSyncs } from "@/server/integrations/graph";
+import { getSetting } from "@/server/services/settings";
 
 /**
  * In-process job runner (started by server.ts). Multiple instances are safe:
@@ -10,6 +14,7 @@ export function startJobRunner(opts: { intervalSeconds?: number; log?: (msg: str
   const intervalMs = Math.max(15, opts.intervalSeconds ?? 60) * 1000;
   const log = opts.log ?? ((m: string) => console.log(m));
   let running = false;
+  let lastGraphCheck = 0;
   const tick = async () => {
     if (running) return;
     running = true;
@@ -21,9 +26,23 @@ export function startJobRunner(opts: { intervalSeconds?: number; log?: (msg: str
       }
     } catch (e) {
       console.error("[jobs] sla sweep failed", e);
-    } finally {
-      running = false;
     }
+    try {
+      const o = await processOutbox();
+      if (!o.skipped && o.sent + o.failed + o.dead > 0) log(`[jobs] outbox: ${o.sent} sent, ${o.failed} retrying, ${o.dead} dead`);
+    } catch (e) {
+      console.error("[jobs] outbox failed", e);
+    }
+    // Directory sync: checked at most every 10 minutes; each tenant syncs per its interval.
+    if (Date.now() - lastGraphCheck > 10 * 60_000) {
+      lastGraphCheck = Date.now();
+      try {
+        for (const s of await runDueGraphSyncs(await getSetting(prisma, "integrations.graph.syncIntervalHours"))) log(`[jobs] graph sync ${s.tenant}: ${JSON.stringify(s.result)}`);
+      } catch (e) {
+        console.error("[jobs] graph sync failed", e);
+      }
+    }
+    running = false;
   };
   const first = setTimeout(tick, 5_000);
   const timer = setInterval(tick, intervalMs);
