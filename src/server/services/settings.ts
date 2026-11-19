@@ -8,6 +8,8 @@ export const SETTINGS_SCHEMA = {
   "attachments.allowedExtensions": z
     .array(z.string().regex(/^[a-z0-9]+$/))
     .default(["jpg", "jpeg", "png", "pdf", "docx", "xlsx", "txt", "log"]),
+  /** "defender": uploads are held (not downloadable) until Microsoft Defender for Storage tags them clean. */
+  "attachments.malwareScan": z.enum(["none", "defender"]).default("none"),
   "tickets.reopenWindowDays": z.number().int().min(0).max(365).default(7),
   "tickets.autoCloseResolvedDays": z.number().int().min(0).max(365).default(3),
   "tickets.fallbackTeamCode": z.string().default("IT-SUPPORT"),

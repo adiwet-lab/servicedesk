@@ -140,7 +140,10 @@ export async function TicketDetail({ actor, idOrNumber, backHref, created, initi
                         <FileText className="size-5 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
                           <a href={`/api/attachments/${a.id}`} className="block truncate text-sm font-medium hover:underline">{a.fileName}</a>
-                          <p className="text-xs text-muted-foreground">{formatBytes(a.sizeBytes)} · {a.uploadedBy.displayName} · {formatDateTime(a.createdAt)}</p>
+                          <p className="text-xs text-muted-foreground">{formatBytes(a.sizeBytes)} · {a.uploadedBy.displayName} · {formatDateTime(a.createdAt)}
+                            {a.scanStatus === "PENDING" && <Badge variant="warning" className="ml-2" data-testid="scan-pending">Scanning…</Badge>}
+                            {a.scanStatus === "INFECTED" && <Badge variant="destructive" className="ml-2" data-testid="scan-blocked">Blocked: malware</Badge>}
+                            {a.scanStatus === "CLEAN" && <Badge variant="success" className="ml-2">Scanned</Badge>}</p>
                         </div>
                         <Button asChild variant="ghost" size="icon"><a href={`/api/attachments/${a.id}`} aria-label="Download"><Download /></a></Button>
                         {!closed && (a.uploadedById === actor.id || perm.canWork) && (

@@ -1,3 +1,4 @@
+import { initialScanStatus } from "@/server/storage/malware-scan";
 import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
 import type { Prisma, TaskStatus } from "@prisma/client";
@@ -342,7 +343,7 @@ export async function addTaskAttachments(actor: Actor, taskId: string, files: Up
       for (const s of stored) {
         await tx.ticketAttachment.create({
           data: { ticketId: task.ticketId, taskId: task.id, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime, sizeBytes: s.f.size,
-            sha256: createHash("sha256").update(s.f.data).digest("hex"), storageKey: s.key },
+            sha256: createHash("sha256").update(s.f.data).digest("hex"), storageKey: s.key, scanStatus: await initialScanStatus(tx) },
         });
       }
       await tx.taskHistory.create({ data: { taskId: task.id, actorId: actor.id, action: "ATTACHMENT_ADDED", newValue: stored.map((s) => s.f.safeName).join(", ") } });

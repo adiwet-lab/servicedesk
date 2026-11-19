@@ -28,6 +28,12 @@ export function SettingsForm({ s, teams, priorities, statuses }: {
             <div className="flex flex-wrap gap-3">{ALL_EXT.map((e) => <label key={e} className="flex items-center gap-1.5 text-sm"><input type="checkbox" name="attachments.allowedExtensions" value={e} defaultChecked={exts.includes(e)} className="accent-primary" /> .{e}</label>)}</div>
             <p className="mt-1 text-xs text-muted-foreground">File content is verified against its type (magic bytes) on upload.</p>
           </fieldset>
+          <Field label="Malware scanning" htmlFor="mscan" className="sm:col-span-2" hint="Defender: enable Microsoft Defender for Storage on-upload malware scanning for the attachment container (STORAGE_DRIVER=azure). New files are held until tagged “No threats found”; malicious files are never served." error={fe["attachments.malwareScan"]}>
+            <NativeSelect id="mscan" name="attachments.malwareScan" defaultValue={String(s["attachments.malwareScan"] ?? "none")} data-testid="malware-scan">
+              <option value="none">Off — upload validation only</option>
+              <option value="defender">Microsoft Defender for Storage — hold files until clean</option>
+            </NativeSelect>
+          </Field>
         </CardContent>
       </Card>
       <Card>

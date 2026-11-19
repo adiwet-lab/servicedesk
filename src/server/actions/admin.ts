@@ -96,6 +96,7 @@ export async function saveSettingsAction(_prev: ActionResult | null, fd: FormDat
       "attachments.maxFileSizeMb": num("attachments.maxFileSizeMb"),
       "attachments.maxFilesPerUpload": num("attachments.maxFilesPerUpload"),
       "attachments.allowedExtensions": raw["attachments.allowedExtensions"],
+      "attachments.malwareScan": raw["attachments.malwareScan"],
       "tickets.reopenWindowDays": num("tickets.reopenWindowDays"),
       "tickets.autoCloseResolvedDays": num("tickets.autoCloseResolvedDays"),
       "tickets.fallbackTeamCode": raw["tickets.fallbackTeamCode"],

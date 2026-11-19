@@ -27,6 +27,7 @@ import { getSettings } from "./settings";
 import { applyStatusChange, computeSlaTargets, recordFirstResponse, startClocks } from "./sla";
 import { normaliseCreateImpact, validateImpact } from "@/server/domain/impact";
 import { planApprovals, startApprovals } from "./approvals";
+import { AttachmentBlockedError, AttachmentScanPendingError, downloadDecision, initialScanStatus, refreshScan } from "@/server/storage/malware-scan";
 import { enqueueTeamsCard } from "@/server/integrations/teams";
 
 // ───────────────────────────── Listing ─────────────────────────────
@@ -446,7 +447,7 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
         await tx.ticketAttachment.create({
           data: {
             ticketId: ticket.id, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime,
-            sizeBytes: s.f.size, sha256: s.sha, storageKey: s.key,
+            sizeBytes: s.f.size, sha256: s.sha, storageKey: s.key, scanStatus: await initialScanStatus(tx),
           },
         });
       }
@@ -684,7 +685,7 @@ export async function addTicketAttachments(actor: Actor, ticketId: string, files
       for (const s of stored) {
         await tx.ticketAttachment.create({
           data: { ticketId, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime, sizeBytes: s.f.size,
-            sha256: createHash("sha256").update(s.f.data).digest("hex"), storageKey: s.key },
+            sha256: createHash("sha256").update(s.f.data).digest("hex"), storageKey: s.key, scanStatus: await initialScanStatus(tx) },
         });
       }
       await tx.ticketHistory.create({ data: { ticketId, actorId: actor.id, action: "ATTACHMENT_ADDED", newValue: stored.map((s) => s.f.safeName).join(", ") } });
@@ -724,6 +725,11 @@ export async function readAttachment(actor: Actor, attachmentId: string) {
     const visible = await prisma.ticketTask.count({ where: { AND: [taskScopeWhere(actor), { id: att.taskId }] } });
     if (!visible) throw new NotFoundError();
   }
+  // Malware-scan gate (attachments.malwareScan): pending files are re-checked on demand.
+  const status = att.scanStatus === "PENDING" ? await refreshScan(att) : att.scanStatus;
+  const decision = downloadDecision(status);
+  if (decision === "blocked") throw new AttachmentBlockedError();
+  if (decision === "pending") throw new AttachmentScanPendingError();
   const storage = await getStorage();
   return { att, data: await storage.get(att.storageKey) };
 }

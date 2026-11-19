@@ -1,3 +1,4 @@
+import { initialScanStatus } from "@/server/storage/malware-scan";
 import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
 import { Prisma, type MessageType } from "@prisma/client";
@@ -175,7 +176,7 @@ export async function postMessage(actor: Actor, ticketId: string, raw: unknown, 
       for (const s of stored) {
         await tx.ticketAttachment.create({
           data: { ticketId: ticket.id, messageId: m.id, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime, sizeBytes: s.f.size,
-            sha256: createHash("sha256").update(s.f.data).digest("hex"), storageKey: s.key },
+            sha256: createHash("sha256").update(s.f.data).digest("hex"), storageKey: s.key, scanStatus: await initialScanStatus(tx) },
         });
       }
       await tx.messageRead.create({ data: { messageId: m.id, userId: actor.id } });

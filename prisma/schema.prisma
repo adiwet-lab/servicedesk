@@ -117,6 +117,13 @@ enum ApprovalDecision {
   CANCELLED
 }
 
+enum ScanStatus {
+  NOT_SCANNED
+  PENDING
+  CLEAN
+  INFECTED
+}
+
 enum OutboxStatus {
   PENDING
   SENT
@@ -773,6 +780,9 @@ model TicketAttachment {
   sizeBytes    Int
   sha256       String
   storageKey   String         @unique
+  /// Malware scan state (attachments.malwareScan). PENDING/INFECTED files cannot be downloaded.
+  scanStatus   ScanStatus     @default(NOT_SCANNED)
+  scannedAt    DateTime?
   createdAt    DateTime       @default(now())
   deletedAt    DateTime?
 

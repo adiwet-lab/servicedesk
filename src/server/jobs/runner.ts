@@ -4,6 +4,7 @@ import { processOutbox } from "@/server/integrations/outbox";
 import { runDueGraphSyncs } from "@/server/integrations/graph";
 import { getSetting } from "@/server/services/settings";
 import { runExpiryNotices } from "@/server/services/admin/access-review";
+import { sweepPendingScans } from "@/server/storage/malware-scan";
 
 /**
  * In-process job runner (started by server.ts). Multiple instances are safe:
@@ -34,6 +35,12 @@ export function startJobRunner(opts: { intervalSeconds?: number; log?: (msg: str
       if (!o.skipped && o.sent + o.failed + o.dead > 0) log(`[jobs] outbox: ${o.sent} sent, ${o.failed} retrying, ${o.dead} dead`);
     } catch (e) {
       console.error("[jobs] outbox failed", e);
+    }
+    try {
+      const m = await sweepPendingScans();
+      if (m.clean + m.infected > 0) log(`[jobs] malware scan: ${m.clean} clean, ${m.infected} blocked`);
+    } catch (e) {
+      console.error("[jobs] malware scan sweep failed", e);
     }
     // Access-expiry notices: hourly check, each user notified once per expiry window.
     if (Date.now() - lastExpiryCheck > 60 * 60_000) {

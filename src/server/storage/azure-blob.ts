@@ -18,6 +18,10 @@ export class AzureBlobStorage implements StorageProvider {
     await this.ready;
     return this.container.getBlobClient(key).downloadToBuffer();
   }
+  async getTags(key: string) {
+    await this.ready;
+    return (await this.container.getBlobClient(key).getTags()).tags;
+  }
   async delete(key: string) {
     await this.ready;
     await this.container.getBlobClient(key).deleteIfExists();

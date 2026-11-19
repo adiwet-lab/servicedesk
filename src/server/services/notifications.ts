@@ -27,6 +27,7 @@ export const NOTIFICATION_TYPES = {
   APPROVAL_REQUESTED: "Approval requested from me",
   APPROVAL_DECIDED: "Approval decision on my ticket",
   ACCESS_EXPIRING: "Account access expiring (vendors / time-limited users)",
+  ATTACHMENT_BLOCKED: "Attachment blocked by malware scan",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 

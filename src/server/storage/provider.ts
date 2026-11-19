@@ -2,6 +2,8 @@ export interface StorageProvider {
   put(key: string, data: Buffer, contentType: string): Promise<void>;
   get(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
+  /** Blob index tags (Azure only) — used to read Defender for Storage scan results. */
+  getTags?(key: string): Promise<Record<string, string>>;
 }
 
 let instance: StorageProvider | null = null;

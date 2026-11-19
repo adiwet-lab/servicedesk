@@ -1,6 +1,7 @@
 import { getActor } from "@/server/auth/get-actor";
 import { readAttachment } from "@/server/services/tickets";
 import { NotFoundError } from "@/server/authz/errors";
+import { AttachmentBlockedError, AttachmentScanPendingError } from "@/server/storage/malware-scan";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   } catch (e) {
     if (e instanceof NotFoundError) return new Response("Not found", { status: 404 });
+    if (e instanceof AttachmentScanPendingError) return new Response(e.message, { status: 409, headers: { "Retry-After": "30" } });
+    if (e instanceof AttachmentBlockedError) return new Response(e.message, { status: 403 });
     throw e;
   }
 }
