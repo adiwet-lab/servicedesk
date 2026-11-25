@@ -180,3 +180,11 @@ Seeded: Hardware Request, Access Request, New Equipment → line manager (fallba
 - Stored business data is not translated: ticket history keeps the status names valid at the time; subjects, descriptions, chat and notes stay as written.
 - Approval step names are snapshotted with their Thai name (`TicketApproval.stepNameTh`) when the ticket is created.
 
+
+
+## Chat-first service (Phase 9)
+- A chat case is a ticket with `channel = CHAT`; the guided start collects category → subcategory → branch → required fields → details, then calls the normal ticket creation. The details and files become the first chat message.
+- Shared queue: `ticketScopeWhere` adds *unclaimed open non-confidential chat cases* for non-vendor actors with `chat.queue`. Claiming uses the same assignment write as *Assign* (`commitAssignment`) with an atomic "still unclaimed" check; the owner team becomes the claimer's team (chosen when the agent is in several teams).
+- Realtime room `chat-queue` (signals `chat:new`, `chat:claimed`, `chat:updated`) keeps consoles and badges current; ticket actions (status, assign, edit, escalate) signal `chat:updated`.
+- Per-user settings live in `UserPreference` (key `chat.filter`).
+

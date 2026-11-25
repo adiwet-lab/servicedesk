@@ -134,7 +134,7 @@ export function ChatQueuePanel({ initialFilter, savedFilter, options, initialRow
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-primary" checked={filter.openOnly} onChange={(e) => set({ openOnly: e.target.checked })} /> {t("openOnly")}</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-primary" checked={filter.includeForm} onChange={(e) => set({ includeForm: e.target.checked })} /> {t("includeForm")}</label>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" disabled={isSaved} data-testid="queue-filter-save"
+              <Button type="button" size="sm" variant={isSaved ? "outline" : "default"} data-testid="queue-filter-save"
                 onClick={() => start(async () => { const r = await saveChatFilterAction(filter); if (r.ok) { setSaved(filter); setMsg(t("savedDefault")); } else setMsg(r.error); })}>
                 <Save /> {t("saveDefault")}
               </Button>
