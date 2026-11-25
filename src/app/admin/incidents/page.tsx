@@ -58,7 +58,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
                         <Link className="font-mono text-xs font-medium text-primary hover:underline" href={`/admin/tickets/${r.number}`}>{r.number}</Link>{" "}
                         <ColorBadge color={r.priority.color}>{r.priority.code}</ColorBadge>
                         <p className="truncate">{r.subject}</p>
-                        <p className="text-xs text-muted-foreground">{r.ownerTeam?.name ?? "—"} · {r.assignedAgent?.displayName ?? tinc("unassigned")}</p>
+                        <p className="text-xs text-muted-foreground">{r.ownerTeam ? ln(r.ownerTeam, locale) : "—"} · {r.assignedAgent?.displayName ?? tinc("unassigned")}</p>
                       </TableCell>
                       <TableCell>{r.majorIncidentStatus && <MiStatusBadge status={r.majorIncidentStatus} />}</TableCell>
                       <TableCell className="max-w-56">

@@ -810,7 +810,9 @@
     "waitingForYou": "รอคุณพิจารณา ({count})",
     "nothingTitle": "ไม่มีรายการรออนุมัติ",
     "nothingDesc": "ไม่มีรายการค้าง",
-    "recentlyDecided": "พิจารณาล่าสุด"
+    "recentlyDecided": "พิจารณาล่าสุด",
+    "stepNameTh": "ชื่อขั้นตอนที่ {n} (ไทย)",
+    "stepNameThPlaceholder": "ชื่อภาษาไทย (ไม่บังคับ)"
   },
   "kb": {
     "wasHelpful": "บทความนี้มีประโยชน์หรือไม่?",
@@ -2209,7 +2211,9 @@
     "cardSlaBreached": "เกิน SLA ({clock}): {number}",
     "cardMiDeclared": "🚨 ประกาศเหตุขัดข้องร้ายแรง: {number}",
     "cardMiStatus": "เหตุขัดข้องร้ายแรง {number}: {status}",
-    "cardMiResolved": "✅ แก้ไขเหตุขัดข้องร้ายแรงแล้ว: {number}"
+    "cardMiResolved": "✅ แก้ไขเหตุขัดข้องร้ายแรงแล้ว: {number}",
+    "noApprover": "ไม่มีผู้อนุมัติสำหรับขั้นตอน \"{name}\" กรุณาติดต่อฝ่ายไอที",
+    "stepChooseApprover": "ขั้นตอนที่ {n}: กรุณาเลือกผู้อนุมัติ"
   },
   "validation": {
     "kbOneLanguage": "กรุณากรอกชื่อและเนื้อหาอย่างน้อยหนึ่งภาษา",

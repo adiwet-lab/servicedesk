@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, ColorBadge } from "@/components/ui/badge";
 import { getTranslations } from "next-intl/server";
 import { currentLocale, getFormat } from "@/i18n/server";
-import { ln } from "@/lib/localized";
+import { ln, pickLang } from "@/lib/localized";
 import { pageTitle } from "@/i18n/metadata";
 
 export const generateMetadata = pageTitle("myApprovals");
@@ -31,7 +31,7 @@ export default async function ApprovalsPage() {
                     <p className="flex flex-wrap items-center gap-2">
                       <Link href={`/tickets/${a.ticket.number}`} className="font-mono text-sm font-medium text-primary hover:underline">{a.ticket.number}</Link>
                       <ColorBadge color={a.ticket.priority.color}>{a.ticket.priority.code}</ColorBadge>
-                      <Badge variant="secondary">{a.stepName}</Badge>
+                      <Badge variant="secondary">{pickLang(a.stepName, a.stepNameTh, locale)}</Badge>
                     </p>
                     <p className="font-medium">{a.ticket.subject}</p>
                     <p className="line-clamp-2 text-sm text-muted-foreground">{a.ticket.description}</p>

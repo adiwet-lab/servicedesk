@@ -13,10 +13,13 @@ import { PageHeader } from "@/components/ui/misc";
 import { AddMemberForm } from "@/components/admin/add-member-form";
 import { pageTitle } from "@/i18n/metadata";
 import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
 export const generateMetadata = pageTitle("teamMembers");
 
 export default async function TeamMembersPage({ params }: { params: Promise<{ id: string }> }) {
+  const locale = await currentLocale();
   const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   const { id } = await params;
@@ -26,7 +29,7 @@ export default async function TeamMembersPage({ params }: { params: Promise<{ id
   return (
     <div className="space-y-5">
       <Link href="/admin/support/teams" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> {tcfg("supportTeams")}</Link>
-      <PageHeader title={team.name} description={<span className="flex flex-wrap gap-2"><Badge variant="secondary">{team.type}</Badge><span>{team.code}</span>{team.tenant && <span>· {team.tenant.name}</span>}</span>} />
+      <PageHeader title={ln(team, locale)} description={<span className="flex flex-wrap gap-2"><Badge variant="secondary">{team.type}</Badge><span>{team.code}</span>{team.tenant && <span>· {team.tenant.name}</span>}</span>} />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{tcfg("addMember")}</CardTitle>

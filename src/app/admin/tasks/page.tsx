@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { pageTitle } from "@/i18n/metadata";
 import { getTranslations } from "next-intl/server";
 import { getFormat } from "@/i18n/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
 export const generateMetadata = pageTitle("tasks");
 
@@ -31,6 +33,7 @@ const qs = (params: Params, patch: Params) => {
 };
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const locale = await currentLocale();
   const ttasksPage = await getTranslations("tasksPage");
   const fmt = await getFormat();
   const actor = await requireAdminPortal();
@@ -104,7 +107,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                     <TableCell className="max-w-72"><Link href={href} className="font-medium hover:underline">{t.title}</Link></TableCell>
                     <TableCell className="text-xs"><Link href={`/admin/tickets/${t.ticket.number}`} className="font-mono text-primary hover:underline">{t.ticket.number}</Link>
                       <div className="max-w-56 truncate text-muted-foreground">{t.ticket.subject}</div></TableCell>
-                    <TableCell className="text-xs whitespace-nowrap"><div>{t.team?.name ?? "—"}</div><div className="text-muted-foreground">{t.assignedAgent?.displayName ?? ttasksPage("unassigned")}</div></TableCell>
+                    <TableCell className="text-xs whitespace-nowrap"><div>{t.team ? ln(t.team, locale) : "—"}</div><div className="text-muted-foreground">{t.assignedAgent?.displayName ?? ttasksPage("unassigned")}</div></TableCell>
                     <TableCell>{t.priority ? <ColorBadge color={t.priority.color}>{t.priority.code}</ColorBadge> : "—"}</TableCell>
                     <TableCell><TaskStatusBadge status={t.status} /></TableCell>
                     <TableCell className={cn("text-xs whitespace-nowrap", overdue && "font-semibold text-destructive")}>{t.dueDate ? fmt.dateTime(t.dueDate) : "—"}{overdue && <Badge variant="destructive" className="ml-1">{ttasksPage("overdue")}</Badge>}</TableCell>

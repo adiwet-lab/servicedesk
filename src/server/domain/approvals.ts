@@ -4,9 +4,9 @@
  * users can approve. A step whose approver cannot be determined falls back to the
  * step's fallback user; if that is impossible too, the chain cannot be built.
  */
-export interface StepDef { order: number; name: string; approverType: "REQUESTER_MANAGER" | "SPECIFIC_USER"; approverUserId: string | null; fallbackUserId: string | null }
+export interface StepDef { order: number; name: string; nameTh?: string | null; approverType: "REQUESTER_MANAGER" | "SPECIFIC_USER"; approverUserId: string | null; fallbackUserId: string | null }
 export interface Candidate { id: string; active: boolean }
-export interface ResolvedStep { order: number; name: string; approverId: string; viaFallback: boolean }
+export interface ResolvedStep { order: number; name: string; nameTh: string | null; approverId: string; viaFallback: boolean }
 
 export function resolveApprovalChain(
   steps: StepDef[],
@@ -17,8 +17,8 @@ export function resolveApprovalChain(
   const out: ResolvedStep[] = [];
   for (const s of [...steps].sort((a, b) => a.order - b.order)) {
     const primary = s.approverType === "REQUESTER_MANAGER" ? requester.managerId : s.approverUserId;
-    if (usable(primary)) { out.push({ order: s.order, name: s.name, approverId: primary, viaFallback: false }); continue; }
-    if (usable(s.fallbackUserId)) { out.push({ order: s.order, name: s.name, approverId: s.fallbackUserId, viaFallback: true }); continue; }
+    if (usable(primary)) { out.push({ order: s.order, name: s.name, nameTh: s.nameTh ?? null, approverId: primary, viaFallback: false }); continue; }
+    if (usable(s.fallbackUserId)) { out.push({ order: s.order, name: s.name, nameTh: s.nameTh ?? null, approverId: s.fallbackUserId, viaFallback: true }); continue; }
     return { ok: false, error: `No approver is available for the approval step "${s.name}". Please contact IT.` };
   }
   if (!out.length) return { ok: false, error: "The approval policy has no steps." };

@@ -45,7 +45,7 @@ export function DecisionButtons({ approvalId, ticketNumber }: { approvalId: stri
 }
 
 type Opt = { id: string; name: string };
-type StepIn = { name: string; approverType: string; approverUserId: string | null; fallbackUserId: string | null };
+type StepIn = { name: string; nameTh?: string | null; approverType: string; approverUserId: string | null; fallbackUserId: string | null };
 export interface PolicyIn { id?: string; name: string; categoryId: string; isActive: boolean; steps: StepIn[] }
 
 export function PolicyDialog({ policy, categories, users, trigger }: {
@@ -92,6 +92,7 @@ export function PolicyDialog({ policy, categories, users, trigger }: {
               {steps.map((s, i) => (
                 <div key={i} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
                   <Input name={`steps.${i}.name`} value={s.name} onChange={(e) => upd(i, { name: e.target.value })} aria-label={ta("stepName", { n: i + 1 })} required />
+                  <Input name={`steps.${i}.nameTh`} value={s.nameTh ?? ""} onChange={(e) => upd(i, { nameTh: e.target.value })} aria-label={ta("stepNameTh", { n: i + 1 })} placeholder={ta("stepNameThPlaceholder")} />
                   <NativeSelect name={`steps.${i}.approverType`} value={s.approverType} onChange={(e) => upd(i, { approverType: e.target.value })} aria-label={ta("stepType", { n: i + 1 })}>
                     <option value="REQUESTER_MANAGER">{ta("managerType")}</option><option value="SPECIFIC_USER">{ta("specificUser")}</option>
                   </NativeSelect>

@@ -810,7 +810,9 @@
     "waitingForYou": "Waiting for you ({count})",
     "nothingTitle": "Nothing to approve",
     "nothingDesc": "You're all caught up.",
-    "recentlyDecided": "Recently decided"
+    "recentlyDecided": "Recently decided",
+    "stepNameTh": "Step {n} name (TH)",
+    "stepNameThPlaceholder": "Thai name (optional)"
   },
   "kb": {
     "wasHelpful": "Was this article helpful?",
@@ -2209,7 +2211,9 @@
     "cardSlaBreached": "SLA breached ({clock}): {number}",
     "cardMiDeclared": "🚨 Major incident declared: {number}",
     "cardMiStatus": "Major incident {number}: {status}",
-    "cardMiResolved": "✅ Major incident resolved: {number}"
+    "cardMiResolved": "✅ Major incident resolved: {number}",
+    "noApprover": "No approver is available for the approval step \"{name}\". Please contact IT.",
+    "stepChooseApprover": "Step {n}: choose the approver"
   },
   "validation": {
     "kbOneLanguage": "Enter the title and body in at least one language.",

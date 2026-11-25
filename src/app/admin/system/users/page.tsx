@@ -16,10 +16,13 @@ import { PageHeader } from "@/components/ui/misc";
 import { pageTitle } from "@/i18n/metadata";
 import { getTranslations } from "next-intl/server";
 import { getFormat } from "@/i18n/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
 export const generateMetadata = pageTitle("userManagement");
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const locale = await currentLocale();
   const tsys = await getTranslations("sysadm");
   const fmt = await getFormat();
   const actor = await requireAdminPortal();
@@ -53,9 +56,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               <TableRow key={u.id}>
                 <TableCell><Link href={`/admin/system/users/${u.id}`} className="font-medium text-primary hover:underline">{u.displayName}</Link><p className="text-xs text-muted-foreground">{u.email}{u.employeeId ? ` · ${u.employeeId}` : ""}</p></TableCell>
                 <TableCell className="text-sm">{u.tenant.name}{u.tenant.type === "VENDOR" && <Badge variant="warning" className="ml-1">{tsys("external")}</Badge>}</TableCell>
-                <TableCell className="text-xs"><div>{u.department?.name ?? "—"}</div><div className="text-muted-foreground">{u.branch?.name}</div></TableCell>
+                <TableCell className="text-xs"><div>{u.department ? ln(u.department, locale) : "—"}</div><div className="text-muted-foreground">{u.branch && ln(u.branch, locale)}</div></TableCell>
                 <TableCell className="space-x-1">{u.roles.map((r) => <Badge key={r.roleId} variant="secondary">{r.role.name}</Badge>)}</TableCell>
-                <TableCell className="text-xs">{u.teamMemberships.map((m) => m.team.name).join(", ") || "—"}</TableCell>
+                <TableCell className="text-xs">{u.teamMemberships.map((m) => ln(m.team, locale)).join(", ") || "—"}</TableCell>
                 <TableCell>{u.status === "ACTIVE" ? <Badge variant="success">{tsys("active")}</Badge> : u.status === "PENDING" ? <Badge variant="warning">{tsys("pending")}</Badge> : <Badge variant="destructive">{tsys("inactive")}</Badge>}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{fmt.dateTime(u.lastLoginAt)}</TableCell>
               </TableRow>

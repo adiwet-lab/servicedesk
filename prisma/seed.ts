@@ -305,11 +305,50 @@ async function main() {
 
   await seedKnowledgeBase();
   await seedApprovalPolicies();
+  await seedThaiNames();
 
   console.log("✅ Seed complete.");
 }
 
 /** Manager approval for hardware, access and new-equipment requests (created only if missing). */
+/** Thai display names for the seeded configuration data. Only fills empty nameTh, so admin edits are kept. */
+const THAI_NAMES = {
+  category: {
+    HW: "ฮาร์ดแวร์", "HW-DT": "คอมพิวเตอร์ตั้งโต๊ะ", "HW-MB": "อุปกรณ์มือถือ", "HW-MN": "จอภาพ", "HW-NB": "โน้ตบุ๊ก", "HW-PE": "อุปกรณ์ต่อพ่วง", "HW-PR": "เครื่องพิมพ์",
+    M365: "Microsoft 365", "M365-ACC": "บัญชีผู้ใช้", "M365-MAIL": "อีเมล", "M365-PERM": "สิทธิ์การเข้าถึง", "M365-TEAMS": "Microsoft Teams",
+    NW: "เครือข่าย", "NW-FW": "ไฟร์วอลล์", "NW-INET": "อินเทอร์เน็ต", "NW-LAN": "แลน (LAN)", "NW-SRV": "เซิร์ฟเวอร์", "NW-VPN": "VPN", "NW-WIFI": "Wi-Fi",
+    REQ: "คำขอด้านไอที", "REQ-ACC": "ขอสิทธิ์การเข้าถึง", "REQ-HW": "ขออุปกรณ์ฮาร์ดแวร์", "REQ-NEW": "ขออุปกรณ์ใหม่", "REQ-SW": "ติดตั้งซอฟต์แวร์",
+    RTL: "ระบบหน้าร้าน", "RTL-BAR": "เครื่องสแกนบาร์โค้ด", "RTL-CCTV": "กล้องวงจรปิด", "RTL-PAY": "เครื่องรับชำระเงิน", "RTL-POS": "POS",
+    SYS: "ระบบงาน", "SYS-ACC": "ระบบบัญชี", "SYS-EC": "อีคอมเมิร์ซ", "SYS-ERP": "ERP", "SYS-HR": "ระบบบุคคล", "SYS-POS": "POS",
+  },
+  priority: { P1: "วิกฤต", P2: "สูง", P3: "ปานกลาง", P4: "ต่ำ" },
+  ticketStatus: {
+    NEW: "ใหม่", ASSIGNED: "มอบหมายแล้ว", IN_PROGRESS: "กำลังดำเนินการ", ON_HOLD: "พักไว้", WAITING_USER: "รอผู้แจ้ง",
+    WAITING_THIRD_PARTY: "รอบุคคลภายนอก", RESOLVED: "แก้ไขแล้ว", CLOSED: "ปิดแล้ว", CANCELLED: "ยกเลิก",
+  },
+  supportTeam: {
+    "IT-SUPPORT": "ไอทีซัพพอร์ต", INFRA: "โครงสร้างพื้นฐาน", ERP: "ทีม ERP", M365: "ทีม Microsoft 365", RETAIL: "ระบบหน้าร้าน",
+    "VENDOR-A": "Vendor A – ผู้ดูแลเครือข่าย", "VENDOR-B": "Vendor B – เครื่องรับชำระเงิน",
+  },
+  department: { IT: "เทคโนโลยีสารสนเทศ", FIN: "การเงิน", OPS: "ปฏิบัติการสาขา", MGMT: "ผู้บริหาร", HR: "ทรัพยากรบุคคล" },
+  branch: { HQ: "สำนักงานใหญ่", BKK01: "กรุงเทพฯ – สาขาสยาม", CNX01: "สาขาเชียงใหม่", FHQ: "สำนักงานใหญ่ Fabrikam" },
+  location: { "BKK01-BO": "หลังร้าน", "BKK01-SF": "พื้นที่ขาย", "CNX01-SF": "พื้นที่ขาย", "FHQ-F1": "ชั้น 1", "HQ-F5": "ชั้น 5", "HQ-F6": "ชั้น 6" },
+} as const;
+
+async function seedThaiNames() {
+  console.log("Seeding Thai names…");
+  const models = {
+    category: prisma.category, priority: prisma.priority, ticketStatus: prisma.ticketStatus, supportTeam: prisma.supportTeam,
+    department: prisma.department, branch: prisma.branch, location: prisma.location,
+  } as unknown as Record<keyof typeof THAI_NAMES, { updateMany(a: { where: object; data: object }): Promise<unknown> }>;
+  for (const [model, names] of Object.entries(THAI_NAMES) as [keyof typeof THAI_NAMES, Record<string, string>][]) {
+    for (const [code, nameTh] of Object.entries(names)) {
+      await models[model].updateMany({ where: { code, nameTh: null }, data: { nameTh } });
+    }
+  }
+  await prisma.approvalStep.updateMany({ where: { name: "Line manager approval", nameTh: null }, data: { nameTh: "อนุมัติโดยผู้บังคับบัญชาสายตรง" } });
+}
+
 async function seedApprovalPolicies() {
   console.log("Seeding approval policies…");
   const fallback = await prisma.user.findFirst({ where: { email: "sys.admin@contoso.example" } });

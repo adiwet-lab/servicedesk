@@ -14,10 +14,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { pageTitle } from "@/i18n/metadata";
 import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
 export const generateMetadata = pageTitle("approvalPolicies");
 
 export default async function ApprovalPoliciesPage() {
+  const locale = await currentLocale();
   const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_WORKFLOW)) notFound();
@@ -41,7 +44,7 @@ export default async function ApprovalPoliciesPage() {
                 {policies.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name} {!p.isActive && <Badge variant="secondary">{tcfg("inactive")}</Badge>}</TableCell>
-                    <TableCell>{p.category.parent ? `${p.category.parent.name} › ` : ""}{p.category.name}</TableCell>
+                    <TableCell>{p.category.parent ? `${ln(p.category.parent, locale)} › ` : ""}{ln(p.category, locale)}</TableCell>
                     <TableCell>
                       <ol className="list-decimal pl-4">
                         {p.steps.map((s) => <li key={s.id}>{s.name}: {s.approverType === "REQUESTER_MANAGER" ? tcfg("requesterSManager") : s.approverUser?.displayName}{s.fallbackUser ? tcfg("fallbackUser", { name: s.fallbackUser.displayName }) : ""}</li>)}
@@ -51,7 +54,7 @@ export default async function ApprovalPoliciesPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <PolicyDialog categories={categories} users={userOpts}
-                          policy={{ id: p.id, name: p.name, categoryId: p.categoryId, isActive: p.isActive, steps: p.steps.map((s) => ({ name: s.name, approverType: s.approverType, approverUserId: s.approverUserId, fallbackUserId: s.fallbackUserId })) }}
+                          policy={{ id: p.id, name: p.name, categoryId: p.categoryId, isActive: p.isActive, steps: p.steps.map((s) => ({ name: s.name, nameTh: s.nameTh, approverType: s.approverType, approverUserId: s.approverUserId, fallbackUserId: s.fallbackUserId })) }}
                           trigger={<Button size="icon" variant="ghost" aria-label={tcfg("editNamed", { name: p.name })}><Pencil /></Button>} />
                         {p._count.tickets === 0 && (
                           <form action={deletePolicyAction}><input type="hidden" name="policyId" value={p.id} />

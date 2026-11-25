@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
 import { pageTitle } from "@/i18n/metadata";
 import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
 export const generateMetadata = pageTitle("supportAgents");
 
 export default async function AgentsPage() {
+  const locale = await currentLocale();
   const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_TEAMS)) notFound();
@@ -37,7 +40,7 @@ export default async function AgentsPage() {
               <TableRow key={a.id}>
                 <TableCell><Link href={`/admin/system/users/${a.id}`} className="font-medium hover:underline">{a.displayName}</Link><p className="text-xs text-muted-foreground">{a.email}</p></TableCell>
                 <TableCell className="text-sm">{a.tenant.name}{a.tenant.type === "VENDOR" && <Badge variant="warning" className="ml-1">{tcfg("external")}</Badge>}</TableCell>
-                <TableCell className="space-x-1">{a.teamMemberships.map((m) => <Badge key={m.teamId} variant="secondary">{m.team.name}{m.role === "LEAD" ? " ★" : ""}</Badge>)}</TableCell>
+                <TableCell className="space-x-1">{a.teamMemberships.map((m) => <Badge key={m.teamId} variant="secondary">{ln(m.team, locale)}{m.role === "LEAD" ? " ★" : ""}</Badge>)}</TableCell>
                 <TableCell className="text-sm">{a.roles.map((r) => r.role.name).join(", ")}</TableCell>
                 <TableCell className="tabular-nums">{wl.get(a.id) ?? 0}</TableCell>
                 <TableCell>{a.status === "ACTIVE" ? <Badge variant="success">{tcfg("active")}</Badge> : <Badge variant="destructive">{a.status}</Badge>}</TableCell>

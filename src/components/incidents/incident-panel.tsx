@@ -81,7 +81,7 @@ export async function IncidentPanel({ actor, ticketId, ticketBase }: { actor: Ac
                   <li key={c.id} className="flex items-center gap-2 py-1.5">
                     <Link className="font-mono text-xs text-primary hover:underline" href={`${ticketBase}/${c.number}`}>{c.number}</Link>
                     <span className="min-w-0 flex-1 truncate">{c.subject}</span>
-                    <Badge variant="secondary" className="shrink-0">{c.status.name}</Badge>
+                    <Badge variant="secondary" className="shrink-0">{ln(c.status, locale)}</Badge>
                     {p.canManage && active && <UnlinkButton childId={c.id} />}
                   </li>
                 ))}

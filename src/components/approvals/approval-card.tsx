@@ -4,7 +4,8 @@ import { ticketApprovals } from "@/server/services/approvals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getTranslations } from "next-intl/server";
-import { getFormat } from "@/i18n/server";
+import { currentLocale, getFormat } from "@/i18n/server";
+import { pickLang } from "@/lib/localized";
 import { DecisionButtons } from "./approval-ui";
 
 const ICON = { APPROVED: CheckCircle2, REJECTED: XCircle, PENDING: Clock, WAITING: Clock, CANCELLED: MinusCircle } as const;
@@ -14,7 +15,7 @@ export async function ApprovalCard({ actor, ticketId, ticketNumber, status }: { 
   if (status === "NOT_REQUIRED") return null;
   const rows = await ticketApprovals(actor, ticketId);
   if (!rows.length) return null;
-  const [ta, f] = await Promise.all([getTranslations("approvals"), getFormat()]);
+  const [ta, f, locale] = await Promise.all([getTranslations("approvals"), getFormat(), currentLocale()]);
   return (
     <Card data-testid="approval-card">
       <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -31,7 +32,7 @@ export async function ApprovalCard({ actor, ticketId, ticketNumber, status }: { 
               <li key={r.id} className="flex gap-2">
                 <Icon className={r.decision === "APPROVED" ? "mt-0.5 size-4 text-success" : r.decision === "REJECTED" ? "mt-0.5 size-4 text-destructive" : "mt-0.5 size-4 text-muted-foreground"} />
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p><span className="font-medium">{r.stepName}</span> · {r.approver.displayName}</p>
+                  <p><span className="font-medium">{pickLang(r.stepName, r.stepNameTh, locale)}</span> · {r.approver.displayName}</p>
                   <p className="text-xs text-muted-foreground">{ta(`decision.${r.decision}`)}{r.decidedAt ? ` · ${f.dateTime(r.decidedAt)}` : ""}</p>
                   {r.comment && <p className="text-xs">“{r.comment}”</p>}
                   {r.canDecide && <DecisionButtons approvalId={r.id} ticketNumber={ticketNumber} />}

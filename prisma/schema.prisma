@@ -1103,6 +1103,7 @@ model TicketApproval {
   ticket     Ticket           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   stepOrder  Int
   stepName   String
+  stepNameTh String?
   approverId String
   approver   User             @relation("TicketApprover", fields: [approverId], references: [id])
   decision   ApprovalDecision @default(WAITING)
