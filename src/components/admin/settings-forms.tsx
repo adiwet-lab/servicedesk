@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import { LOCALES, LOCALE_LABEL } from "@/i18n/config";
 import { saveSequenceAction, saveSettingsAction } from "@/server/actions/admin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,7 +60,7 @@ export function SettingsForm({ s, teams, priorities, statuses }: {
           </Field>
           <Field label={tsettings("cardLocale")} htmlFor="dl" hint={tsettings("cardLocaleHint")}>
             <NativeSelect id="dl" name="i18n.defaultLocale" defaultValue={String(s["i18n.defaultLocale"] ?? "th")} data-testid="default-locale">
-              <option value="th">ไทย (Thai)</option><option value="en">English</option>
+              {LOCALES.map((l) => <option key={l} value={l}>{LOCALE_LABEL[l]}</option>)}
             </NativeSelect>
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="tickets.requesterCanSetPriority" defaultChecked={!!s["tickets.requesterCanSetPriority"]} className="accent-primary" /> {tsettings("requestersMayChoosePriority")}</label>
