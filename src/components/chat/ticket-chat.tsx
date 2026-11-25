@@ -30,7 +30,7 @@ function MessageBubble({ m, q }: { m: ChatMessageDto; q?: string }) {
       <Avatar name={m.sender.name} />
       <div className={cn("max-w-[78%] space-y-1", m.mine && "items-end text-right")}>
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{m.sender.name}</span> · {m.sender.role} · {fmt.dateTime(m.createdAt)}
+          <span className="font-medium text-foreground">{m.sender.name}</span> · {tchat(`senderRole.${m.sender.role}`)} · {fmt.dateTime(m.createdAt)}
         </p>
         <div className={cn(
           "inline-block rounded-xl px-3.5 py-2 text-left text-sm",
@@ -60,10 +60,15 @@ function MessageBubble({ m, q }: { m: ChatMessageDto; q?: string }) {
   );
 }
 
-export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExtensions }: {
+export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExtensions, variant = "card", footer }: {
   ticketId: string; perms: ChatPerms; initial: { messages: ChatMessageDto[]; hasMore: boolean };
   maxFileSizeMb: number; allowedExtensions: string[];
+  /** "messenger": full-height conversation without card frame or search bar (chat pages). */
+  variant?: "card" | "messenger";
+  /** Rendered between the conversation and the composer (e.g. quick-reply buttons). */
+  footer?: React.ReactNode;
 }) {
+  const messenger = variant === "messenger";
   const tchat = useTranslations("chat");
   const [messages, setMessages] = useState(initial.messages);
   const [hasMore, setHasMore] = useState(initial.hasMore);
@@ -157,20 +162,19 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
   const canPost = perms.canPostPublic || perms.canPostInternal;
   const shown = results ?? messages;
 
-  return (
-    <Card>
-      <CardContent className="space-y-4 pt-5">
-        <form onSubmit={runSearch} className="flex gap-2" role="search">
+  const body = (
+    <>
+        {!messenger && <form onSubmit={runSearch} className="flex gap-2" role="search">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder={tchat("searchThisConversation")} className="pl-9" aria-label={tchat("searchChat")} data-testid="chat-search" />
           </div>
           <Button type="submit" variant="secondary">{tchat("search")}</Button>
           {results && <Button type="button" variant="ghost" onClick={() => { setResults(null); setSearchQ(""); }}><X /> {tchat("clear")}</Button>}
-        </form>
+        </form>}
         {results && <p className="text-sm text-muted-foreground" data-testid="chat-search-count">{tchat("searchCount", { n: results.length, q: searchQ })}</p>}
 
-        <div className="max-h-[32rem] overflow-y-auto rounded-lg border bg-background/50 p-4" data-testid="chat-log">
+        <div className={messenger ? "min-h-0 flex-1 overflow-y-auto p-4" : "max-h-[32rem] overflow-y-auto rounded-lg border bg-background/50 p-4"} data-testid="chat-log">
           {!results && hasMore && (
             <div className="mb-3 text-center"><Button variant="ghost" size="sm" onClick={loadEarlier}>{tchat("loadEarlierMessages")}</Button></div>
           )}
@@ -181,9 +185,10 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
           )}
           <div ref={bottomRef} />
         </div>
+        {footer}
 
         {canPost ? (
-          <form ref={formRef} onSubmit={onSubmit} className={cn("space-y-2 rounded-lg border p-3", type === "INTERNAL" && "border-dashed border-amber-500/70 bg-amber-50/50 dark:bg-amber-950/20")}>
+          <form ref={formRef} onSubmit={onSubmit} className={cn("space-y-2 rounded-lg border p-3", messenger && "m-3 mt-0 bg-card", type === "INTERNAL" && "border-dashed border-amber-500/70 bg-amber-50/50 dark:bg-amber-950/20")}>
             <input type="hidden" name="ticketId" value={ticketId} />
             {error && <Alert variant="destructive">{error}</Alert>}
             {perms.canPostInternal && (
@@ -212,11 +217,12 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
             </div>
           </form>
         ) : (
-          <Alert>{perms.closed ? tchat("thisTicketIsClosedTheConversation") : tchat("youCanFollowThisConversationBut")}</Alert>
+          <Alert className={messenger ? "m-3 mt-0" : undefined}>{perms.closed ? tchat("thisTicketIsClosedTheConversation") : tchat("youCanFollowThisConversationBut")}</Alert>
         )}
-      </CardContent>
-    </Card>
+    </>
   );
+  if (messenger) return <div className="flex h-full min-h-0 flex-col">{body}</div>;
+  return <Card><CardContent className="space-y-4 pt-5">{body}</CardContent></Card>;
 }
 
 /** Live unread counter for the Chat tab label. */

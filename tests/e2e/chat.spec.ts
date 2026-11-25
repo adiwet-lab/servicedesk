@@ -60,10 +60,10 @@ test("realtime chat between requester and agent, internal notes, attachments, un
   await expect(emma.getByTestId("toast").first()).toContainText(number);
   await expect.poll(bellCount).toBeGreaterThan(bellBefore);
 
-  // Messages inbox shows the unread conversation
-  await emma.goto("/messages?unread=1");
-  await expect(emma.getByTestId("inbox-list")).toContainText(number);
-  await emma.getByTestId("inbox-list").getByText(subject).click();
+  // The chat page lists the conversation (Phase 9: replaces the Messages inbox)
+  await emma.goto("/chat");
+  await expect(emma.getByTestId("chat-list")).toContainText(number);
+  await emma.getByTestId("chat-list").getByText(subject).click();
 
   // Opening the chat: reply + image visible, internal note never visible, unread cleared
   await expect(emma.getByTestId("chat-log")).toContainText("licence assigned");

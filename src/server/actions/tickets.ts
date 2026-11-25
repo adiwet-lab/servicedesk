@@ -9,6 +9,7 @@ import {
 import { markNotificationsRead } from "@/server/services/notifications";
 import { changeStatusSchema, assignTicketSchema } from "@/lib/validation/ticket";
 import { runAction, formToObject, filesFromForm, type ActionResult } from "./result";
+import { signalChatUpdated } from "@/server/services/chat-cases";
 
 export async function createTicketAction(_prev: ActionResult<{ number: string }> | null, fd: FormData): Promise<ActionResult<{ number: string }>> {
   const result = await runAction(async () => {
@@ -27,6 +28,7 @@ export async function changeStatusAction(_prev: ActionResult | null, fd: FormDat
     const input = changeStatusSchema.parse(formToObject(fd));
     await changeTicketStatus(actor, { ...input, reason: input.reason ?? undefined, resolutionSummary: input.resolutionSummary ?? undefined });
     revalidatePath("/", "layout");
+    signalChatUpdated(String(fd.get("ticketId") ?? ""));
     return undefined;
   }, "Status updated");
 }
@@ -37,6 +39,7 @@ export async function assignTicketAction(_prev: ActionResult | null, fd: FormDat
     const input = assignTicketSchema.parse(formToObject(fd));
     await assignTicket(actor, { ticketId: input.ticketId, teamId: input.teamId, agentId: input.agentId, reason: input.reason ?? undefined });
     revalidatePath("/", "layout");
+    signalChatUpdated(String(fd.get("ticketId") ?? ""));
     return undefined;
   }, "Assignment updated");
 }

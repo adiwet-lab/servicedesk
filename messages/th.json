@@ -87,7 +87,9 @@
     "integrations": "การเชื่อมต่อระบบ",
     "auditLogs": "บันทึกการตรวจสอบ",
     "accessReview": "ทบทวนสิทธิ์การเข้าถึง",
-    "systemSettings": "ตั้งค่าระบบ"
+    "systemSettings": "ตั้งค่าระบบ",
+    "chat": "แชทกับไอที",
+    "chatQueueBadge": "แชทที่รอรับ"
   },
   "navSection": {
     "dashboardsReports": "แดชบอร์ดและรายงาน",
@@ -506,7 +508,8 @@
     "myTickets": "ทิกเก็ตของฉัน",
     "branchTickets": "ทิกเก็ตของสาขา",
     "departmentTickets": "ทิกเก็ตของแผนก",
-    "dashboard": "แดชบอร์ด"
+    "dashboard": "แดชบอร์ด",
+    "chat": "แชทกับไอที"
   },
   "portal": {
     "myTicketsDesc": "ทิกเก็ตที่คุณแจ้งไว้",
@@ -520,7 +523,8 @@
     "totalMyTickets": "ทิกเก็ตของฉันทั้งหมด",
     "overdue": "เกินกำหนด",
     "recentTickets": "ทิกเก็ตล่าสุด",
-    "viewAll": "ดูทั้งหมด"
+    "viewAll": "ดูทั้งหมด",
+    "reportIssue": "แจ้งปัญหา"
   },
   "notificationsPage": {
     "description": "การแจ้งเตือนเกี่ยวกับทิกเก็ตและงานที่มอบหมายให้คุณ",
@@ -705,6 +709,10 @@
     "attachmentBlocked": {
       "title": "ไฟล์แนบถูกบล็อก: {file}",
       "body": "ตรวจพบมัลแวร์ ไม่สามารถดาวน์โหลดไฟล์นี้ได้"
+    },
+    "chatClaimed": {
+      "title": "{agent} รับเรื่อง {number} แล้ว",
+      "body": "{subject}"
     }
   },
   "clock": {
@@ -1312,7 +1320,13 @@
     "requesterName": "ผู้แจ้ง: {name}",
     "pager": "{n} การสนทนา · หน้า {page} จาก {pages}",
     "inboxStaffDesc": "การสนทนาในทิกเก็ตที่คุณเข้าถึงได้ ล่าสุดก่อน บันทึกภายในแสดงเฉพาะเจ้าหน้าที่ที่มีสิทธิ์",
-    "inboxMineDesc": "การสนทนากับฝ่ายไอทีเกี่ยวกับทิกเก็ตของคุณ"
+    "inboxMineDesc": "การสนทนากับฝ่ายไอทีเกี่ยวกับทิกเก็ตของคุณ",
+    "senderRole": {
+      "Requester": "ผู้แจ้ง",
+      "Support": "เจ้าหน้าที่",
+      "External support": "เจ้าหน้าที่ภายนอก",
+      "User": "ผู้ใช้"
+    }
   },
   "tasksPage": {
     "taskNoTitleTicketNoOr": "เลขงานย่อย ชื่อ เลขทิกเก็ต หรือหัวข้อ",
@@ -2249,7 +2263,11 @@
     "fldAffectedSystem": "ระบบที่ได้รับผลกระทบ",
     "fldAffectedUsers": "ผู้ได้รับผลกระทบ",
     "fldLocation": "สถานที่",
-    "fldAttachments": "ไฟล์แนบ"
+    "fldAttachments": "ไฟล์แนบ",
+    "chatOnlyClaim": "รับได้เฉพาะเคสที่แจ้งผ่านแชท",
+    "chatAlreadyClaimed": "แชทนี้มีเจ้าหน้าที่คนอื่นรับไปแล้ว",
+    "chatNoTeam": "คุณยังไม่ได้อยู่ในทีมสนับสนุนใด",
+    "chatChooseTeam": "กรุณาเลือกทีมที่จะรับแชทนี้"
   },
   "srvTpl": {
     "hostNotAllowed": "{err} กรุณาเพิ่มโฮสต์ใน INTEGRATIONS_ALLOWED_HOSTS",
@@ -2333,5 +2351,80 @@
       "title": "เกิน SLA",
       "desc": "ทิกเก็ตที่เกินหรือกำลังจะเกิน SLA"
     }
+  },
+  "chatFlow": {
+    "welcome": "สวัสดีค่ะ คุณ {name} ให้ฝ่ายไอทีช่วยเรื่องอะไรดีคะ",
+    "newCase": "แจ้งเคสใหม่",
+    "followUp": "ติดตามเรื่อง",
+    "pickCase": "ต้องการติดตามเรื่องไหนคะ",
+    "noOpenCases": "ตอนนี้คุณไม่มีเรื่องที่ยังเปิดอยู่ค่ะ",
+    "pickCategory": "เป็นปัญหาเกี่ยวกับเรื่องอะไรคะ",
+    "pickSubcategory": "{category} ส่วนไหนคะ",
+    "pickBranch": "อยู่ที่สาขาไหนคะ",
+    "otherBranch": "สาขาอื่น…",
+    "searchBranch": "ค้นหาสาขา",
+    "extraIntro": "หัวข้อนี้ต้องการข้อมูลเพิ่มเติมเล็กน้อยค่ะ",
+    "extraDone": "กรอกข้อมูลแล้ว",
+    "select": "เลือก…",
+    "next": "ถัดไป",
+    "typeDetails": "พิมพ์รายละเอียดปัญหาได้เลยค่ะ ส่งรูปหรือไฟล์แนบมาด้วยได้",
+    "attachmentRequired": "หัวข้อนี้ต้องแนบรูปหรือไฟล์ด้วยค่ะ",
+    "fileTooBig": "ไฟล์ \"{name}\" ใหญ่เกิน {mb} MB",
+    "detailsPlaceholder": "พิมพ์ข้อความ…",
+    "chooseAbove": "เลือกจากตัวเลือกด้านบนก่อนค่ะ",
+    "attach": "แนบรูปหรือไฟล์",
+    "send": "ส่ง",
+    "enterHint": "Enter เพื่อส่ง · Shift+Enter ขึ้นบรรทัดใหม่",
+    "restart": "เริ่มใหม่",
+    "field": {
+      "contactNumber": "เบอร์ติดต่อ",
+      "relatedAsset": "รหัสทรัพย์สิน / หมายเลขเครื่อง",
+      "affectedSystem": "ระบบที่ได้รับผลกระทบ",
+      "affectedUsers": "มีใครได้รับผลกระทบอีกบ้าง",
+      "locationId": "สถานที่"
+    },
+    "created": "รับเรื่องแล้วค่ะ เลขที่ {number} ทีม{team}จะตอบกลับในแชทนี้",
+    "createdNoTeam": "รับเรื่องแล้วค่ะ เลขที่ {number} เจ้าหน้าที่ไอทีจะตอบกลับในแชทนี้",
+    "waitingAgent": "รอเจ้าหน้าที่รับเรื่อง",
+    "handledBy": "ดูแลโดย {name}",
+    "pendingApproval": "คำขอนี้ต้องได้รับการอนุมัติก่อน เจ้าหน้าที่จะเริ่มดำเนินการเมื่ออนุมัติแล้วค่ะ",
+    "resolvedAsk": "เจ้าหน้าที่แจ้งว่าแก้ไขเรียบร้อยแล้ว ใช้งานได้ปกติหรือยังคะ",
+    "closedNote": "เรื่องนี้ปิดแล้วค่ะ",
+    "details": "ดูรายละเอียดเคส",
+    "conversations": "การสนทนา",
+    "startNew": "เริ่มแชทใหม่",
+    "noConversations": "ยังไม่มีการสนทนาที่เปิดอยู่",
+    "useForm": "ต้องการกรอกแบบฟอร์มแทน?",
+    "back": "ย้อนกลับ",
+    "notFound": "ไม่พบการสนทนานี้"
+  },
+  "chatConsole": {
+    "view": {
+      "unclaimed": "ยังไม่มีคนรับ",
+      "mine": "ของฉัน",
+      "myTeams": "ทีมของฉัน",
+      "all": "ทั้งหมด"
+    },
+    "search": "เลขเคส หัวข้อ หรือผู้แจ้ง",
+    "filter": "ตัวกรอง",
+    "filterCount": "ตัวกรอง ({n})",
+    "categories": "หมวดหมู่",
+    "statuses": "สถานะ",
+    "teams": "ทีม",
+    "branches": "สาขา",
+    "openOnly": "ซ่อนเรื่องที่ปิดแล้ว",
+    "includeForm": "รวมทิกเก็ตที่สร้างจากแบบฟอร์ม",
+    "saveDefault": "บันทึกเป็นค่าเริ่มต้นของฉัน",
+    "savedDefault": "บันทึกแล้ว — หน้าแชทจะเปิดด้วยตัวกรองนี้",
+    "useDefault": "ค่าเริ่มต้นของฉัน",
+    "clear": "ล้าง",
+    "empty": "ไม่มีแชทที่ตรงกับตัวกรอง",
+    "unclaimed": "รอรับ",
+    "waiting": "รอ {time}",
+    "claim": "รับแชท",
+    "claimAs": "รับในนามทีม…",
+    "unclaimedHint": "รอเจ้าหน้าที่ภายในรับแชทนี้",
+    "pickConversation": "เลือกแชทจากรายการ",
+    "pickConversationHint": "แชทใหม่จะอยู่ในแท็บ “ยังไม่มีคนรับ” กดรับแชทก่อนจึงจะตอบได้ และปรับสถานะเมื่อจบการสนทนา"
   }
 }

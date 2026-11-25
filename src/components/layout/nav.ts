@@ -16,11 +16,12 @@ export interface NavSection { title?: string; items: NavItem[] }
 export function portalNav(actor: Actor): NavSection[] {
   const views = availableViews(actor);
   const items: NavItem[] = [{ label: "nav.dashboard", href: "/dashboard", icon: "dashboard" }];
+  // Phase 9: chat is the main way to report and follow up issues (it replaces the Messages inbox).
+  if (can(actor, P.TICKET_CREATE) || views.has("my")) items.push({ label: "nav.chat", href: "/chat", icon: "chat", badge: "messages" });
   if (views.has("my")) items.push({ label: "nav.myTickets", href: "/tickets", icon: "ticket" });
   if (views.has("department")) items.push({ label: "nav.departmentTickets", href: "/tickets/department", icon: "users" });
   if (views.has("branch")) items.push({ label: "nav.branchTickets", href: "/tickets/branch", icon: "building" });
   if (can(actor, P.TICKET_CREATE)) items.push({ label: "nav.createTicket", href: "/tickets/new", icon: "plus" });
-  if (views.has("my")) items.push({ label: "nav.messages", href: "/messages", icon: "chat", badge: "messages" });
   items.push({ label: "nav.helpCenter", href: "/help", icon: "file" });
   if (!isVendor(actor)) items.push({ label: "nav.myApprovals", href: "/approvals", icon: "shield" });
   items.push({ label: "nav.notifications", href: "/notifications", icon: "bell" }, { label: "nav.profile", href: "/profile", icon: "user" });

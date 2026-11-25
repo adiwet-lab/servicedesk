@@ -21,6 +21,11 @@ const MATCH_NOTHING: Prisma.TicketWhereInput = { id: { in: [] } };
  *
  * Vendor-tenant users never receive read.own-based dept/branch visibility.
  */
+/** Open chat cases without an agent (the shared chat queue). Never confidential. */
+export const UNCLAIMED_CHAT: Prisma.TicketWhereInput = {
+  channel: "CHAT", assignedAgentId: null, isConfidential: false, status: { kind: { notIn: ["CLOSED", "CANCELLED"] } },
+};
+
 export function ticketScopeWhere(actor: Actor): Prisma.TicketWhereInput {
   const perms = actor.permissions;
   const vendor = isVendor(actor);
@@ -53,6 +58,9 @@ export function ticketScopeWhere(actor: Actor): Prisma.TicketWhereInput {
       or.push({ assignedAgentId: actor.id });
       or.push({ tasks: { some: { assignedAgentId: actor.id } } });
     }
+
+    // Chat queue (Phase 9): internal staff see every chat case nobody has claimed yet, so the right team can pick it up.
+    if (!vendor && perms.has(P.CHAT_QUEUE)) or.push(UNCLAIMED_CHAT);
 
     // Approvers see the tickets awaiting (or decided by) them.
     if (!vendor) or.push({ approvals: { some: { approverId: actor.id, decision: { not: "WAITING" } } } });

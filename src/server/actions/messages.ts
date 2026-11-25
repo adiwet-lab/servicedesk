@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { requireActorOrThrow } from "@/server/auth/get-actor";
 import { getChatPermissions, listMessages, markTicketRead, postMessage, totalUnreadMessages, unreadCounts } from "@/server/services/messages";
 import { unreadCount } from "@/server/services/notifications";
+import { unclaimedChatCount } from "@/server/services/chat-cases";
 import { runAction, filesFromForm, type ActionResult } from "./result";
 
 export async function fetchMessagesAction(ticketId: string, opts: { before?: string; after?: string; q?: string } = {}) {
@@ -31,8 +32,8 @@ export async function chatPermissionsAction(ticketId: string) {
 /** Badge counts for the shell (bell + messages). */
 export async function badgeCountsAction() {
   const actor = await requireActorOrThrow();
-  const [notifications, messages] = await Promise.all([unreadCount(prisma, actor), totalUnreadMessages(actor)]);
-  return { notifications, messages };
+  const [notifications, messages, chatQueue] = await Promise.all([unreadCount(prisma, actor), totalUnreadMessages(actor), unclaimedChatCount(actor)]);
+  return { notifications, messages, chatQueue };
 }
 
 export async function ticketUnreadAction(ticketId: string) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PlusCircle } from "lucide-react";
+import { MessageSquarePlus } from "lucide-react";
 import { requireActor } from "@/server/auth/get-actor";
 import { can, canAccessAdminPortal } from "@/server/authz/guards";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
       <PageHeader
         title={t("welcome", { name: actor.displayName.split(" ")[0] ?? "" })}
         description={t("dashboardDesc")}
-        actions={can(actor, P.TICKET_CREATE) && <Button asChild><Link href="/tickets/new"><PlusCircle /> {t("createTicket")}</Link></Button>}
+        actions={can(actor, P.TICKET_CREATE) && <Button asChild><Link href="/chat?new=1" data-testid="dashboard-report"><MessageSquarePlus /> {t("reportIssue")}</Link></Button>}
       />
       <div className="mb-5"><KnownIssuesBanner actor={actor} /></div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">

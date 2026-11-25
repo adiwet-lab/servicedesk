@@ -32,6 +32,7 @@ import { ln } from "@/lib/localized";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { AttachmentBlockedError, AttachmentScanPendingError, downloadDecision, initialScanStatus, refreshScan } from "@/server/storage/malware-scan";
 import { enqueueTeamsCard } from "@/server/integrations/teams";
+import { queueEvent, rooms } from "@/server/realtime/bus";
 
 // ───────────────────────────── Listing ─────────────────────────────
 
@@ -269,7 +270,8 @@ export interface CreateTicketResult {
   number: string;
 }
 
-export async function createTicket(actor: Actor, raw: unknown, files: UploadCandidate[] = []): Promise<CreateTicketResult> {
+export async function createTicket(actor: Actor, raw: unknown, files: UploadCandidate[] = [], opts: { channel?: "FORM" | "CHAT" } = {}): Promise<CreateTicketResult> {
+  const channel = opts.channel ?? "FORM";
   requirePermission(actor, P.TICKET_CREATE);
   await enforceRateLimit(`ticket:create:${actor.id}`, 20, 60 * 60 * 1000);
 
@@ -429,10 +431,15 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
           impactedBranches: impact?.branchIds.length ? { create: impact.branchIds.map((id) => ({ branchId: id })) } : undefined,
           ownerTeamId: routing.teamId,
           assignedAgentId: routing.agentId,
+          channel,
           ...sla,
           createdAt: now,
         },
       });
+      // Chat cases: the details (and files) are the first message of the conversation.
+      const firstMessage = channel === "CHAT"
+        ? await tx.ticketMessage.create({ data: { ticketId: ticket.id, senderId: actor.id, type: "PUBLIC", body: input.description, createdAt: now } })
+        : null;
       await tx.ticketHistory.create({
         data: { ticketId: ticket.id, actorId: actor.id, action: "CREATED", newValue: `${number} — ${input.subject}` },
       });
@@ -449,7 +456,7 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
       for (const s of stored) {
         await tx.ticketAttachment.create({
           data: {
-            ticketId: ticket.id, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime,
+            ticketId: ticket.id, uploadedById: actor.id, fileName: s.f.safeName, mimeType: s.f.mime, messageId: firstMessage?.id ?? null,
             sizeBytes: s.f.size, sha256: s.sha, storageKey: s.key, scanStatus: await initialScanStatus(tx),
           },
         });
@@ -471,6 +478,10 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
       await notifyUsers(tx, teamUsers, { type: "TICKET_CREATED", key: "ticketCreated", params: { number, subject: input.subject }, title: `New ticket ${number}`, body: input.subject, ticketId: ticket.id, link }, actor);
       if (requester.id !== actor.id) {
         await notifyUsers(tx, [requester.id], { type: "TICKET_CREATED", key: "ticketLogged", params: { number, subject: input.subject }, title: `Ticket ${number} was logged for you`, body: input.subject, ticketId: ticket.id, link }, actor);
+      }
+      if (channel === "CHAT") {
+        queueEvent(tx, { room: rooms.chatQueue, event: "chat:new", payload: { ticketId: ticket.id } });
+        if (routing.agentId) queueEvent(tx, { room: rooms.chatQueue, event: "chat:claimed", payload: { ticketId: ticket.id } });
       }
       return { id: ticket.id, number };
     });
@@ -591,7 +602,23 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
   }
   if (!teamChanged && newAgentId === ticket.assignedAgentId) throw new ValidationError("Nothing to change.");
   if (teamChanged && !input.reason) throw new ValidationError("A reason is required when transferring to another team.");
+  await commitAssignment(actor, ticket, { team, newAgentId, reason: input.reason });
+}
 
+type MutationTicket = Awaited<ReturnType<typeof loadTicketForMutation>>;
+
+/**
+ * Writes an (already authorized and validated) team/agent change: auto "Assigned" status, SLA first response,
+ * assignment row, history, audit, notifications and Teams card. With `onlyIfUnclaimed` the write only happens
+ * when the ticket still has no agent (atomic claim); otherwise it throws "already claimed".
+ */
+export async function commitAssignment(
+  actor: Actor, ticket: MutationTicket,
+  input: { team: { id: string; name: string; nameTh: string | null }; newAgentId: string | null; reason?: string; onlyIfUnclaimed?: boolean },
+) {
+  const { team, newAgentId } = input;
+  const newTeamId = team.id;
+  const teamChanged = newTeamId !== ticket.ownerTeamId;
   const type = teamChanged ? "TRANSFER" : ticket.assignedAgentId ? "REASSIGN" : "ASSIGN";
   const settings = await getSettings(prisma);
 
@@ -607,6 +634,10 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
 
   await transaction(async (tx) => {
     const now = new Date();
+    if (input.onlyIfUnclaimed) {
+      const claimed = await tx.ticket.updateMany({ where: { id: ticket.id, assignedAgentId: null }, data: { assignedAgentId: newAgentId } });
+      if (claimed.count === 0) throw new ValidationError("This chat has already been claimed by someone else.");
+    }
     const slaData = autoStatus
       ? { ...(await applyStatusChange(tx, ticket, autoStatus, now)), ...(await recordFirstResponse(tx, ticket, now)) }
       : {};

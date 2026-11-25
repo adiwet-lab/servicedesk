@@ -87,7 +87,9 @@
     "integrations": "Integrations",
     "auditLogs": "Audit Logs",
     "accessReview": "Access Review",
-    "systemSettings": "System Settings"
+    "systemSettings": "System Settings",
+    "chat": "Chat with IT",
+    "chatQueueBadge": "Unclaimed chats"
   },
   "navSection": {
     "dashboardsReports": "Dashboards & Reports",
@@ -506,7 +508,8 @@
     "myTickets": "My Tickets",
     "branchTickets": "Branch Tickets",
     "departmentTickets": "Department Tickets",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "chat": "Chat with IT"
   },
   "portal": {
     "myTicketsDesc": "Tickets you have requested.",
@@ -520,7 +523,8 @@
     "totalMyTickets": "Total My Tickets",
     "overdue": "Overdue",
     "recentTickets": "Recent tickets",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "reportIssue": "Report an issue"
   },
   "notificationsPage": {
     "description": "In-app notifications about your tickets and assignments.",
@@ -705,6 +709,10 @@
     "attachmentBlocked": {
       "title": "Attachment blocked: {file}",
       "body": "Malware was detected; the file cannot be downloaded."
+    },
+    "chatClaimed": {
+      "title": "{agent} is handling {number}",
+      "body": "{subject}"
     }
   },
   "clock": {
@@ -1312,7 +1320,13 @@
     "requesterName": "Requester: {name}",
     "pager": "{n, plural, one {# conversation} other {# conversations}} · page {page} of {pages}",
     "inboxStaffDesc": "Ticket conversations you can access, newest first. Internal notes are only shown to authorized staff.",
-    "inboxMineDesc": "Conversations with IT Support about your tickets."
+    "inboxMineDesc": "Conversations with IT Support about your tickets.",
+    "senderRole": {
+      "Requester": "Requester",
+      "Support": "Support",
+      "External support": "External support",
+      "User": "User"
+    }
   },
   "tasksPage": {
     "taskNoTitleTicketNoOr": "Task no., title, ticket no. or subject",
@@ -2249,7 +2263,11 @@
     "fldAffectedSystem": "Affected System",
     "fldAffectedUsers": "Affected Users",
     "fldLocation": "Location",
-    "fldAttachments": "Attachments"
+    "fldAttachments": "Attachments",
+    "chatOnlyClaim": "Only chat cases can be claimed.",
+    "chatAlreadyClaimed": "This chat has already been claimed by someone else.",
+    "chatNoTeam": "You are not a member of any support team.",
+    "chatChooseTeam": "Choose the team that takes this chat."
   },
   "srvTpl": {
     "hostNotAllowed": "{err} Add the host to INTEGRATIONS_ALLOWED_HOSTS.",
@@ -2333,5 +2351,80 @@
       "title": "SLA Breached",
       "desc": "Tickets that breached or are breaching SLA."
     }
+  },
+  "chatFlow": {
+    "welcome": "Hi {name}! How can IT help you today?",
+    "newCase": "Report a new issue",
+    "followUp": "Follow up an issue",
+    "pickCase": "Which issue would you like to follow up?",
+    "noOpenCases": "You have no open issues right now.",
+    "pickCategory": "What is it about?",
+    "pickSubcategory": "Which part of {category}?",
+    "pickBranch": "Which branch is it at?",
+    "otherBranch": "Other branch…",
+    "searchBranch": "Search branch",
+    "extraIntro": "This topic needs a few details first:",
+    "extraDone": "Details added",
+    "select": "Select…",
+    "next": "Next",
+    "typeDetails": "Please describe the problem — you can also send photos or files.",
+    "attachmentRequired": "A file or photo is required for this topic.",
+    "fileTooBig": "\"{name}\" is larger than {mb} MB.",
+    "detailsPlaceholder": "Type your message…",
+    "chooseAbove": "Choose an option above",
+    "attach": "Attach photo or file",
+    "send": "Send",
+    "enterHint": "Enter to send · Shift+Enter for a new line",
+    "restart": "Start over",
+    "field": {
+      "contactNumber": "Contact number",
+      "relatedAsset": "Asset tag / serial number",
+      "affectedSystem": "Affected system",
+      "affectedUsers": "Who else is affected?",
+      "locationId": "Location"
+    },
+    "created": "Got it! Your case number is {number}. The {team} team will reply here.",
+    "createdNoTeam": "Got it! Your case number is {number}. IT will reply here.",
+    "waitingAgent": "Waiting for an IT agent",
+    "handledBy": "Handled by {name}",
+    "pendingApproval": "This request needs approval first; IT will start once it is approved.",
+    "resolvedAsk": "IT marked this issue as solved. Is everything working now?",
+    "closedNote": "This case is closed.",
+    "details": "Case details",
+    "conversations": "Conversations",
+    "startNew": "New chat",
+    "noConversations": "No open conversations",
+    "useForm": "Prefer a form? Fill in the ticket form",
+    "back": "Back",
+    "notFound": "This conversation is not available."
+  },
+  "chatConsole": {
+    "view": {
+      "unclaimed": "Unclaimed",
+      "mine": "Mine",
+      "myTeams": "My teams",
+      "all": "All"
+    },
+    "search": "Number, subject or requester",
+    "filter": "Filter",
+    "filterCount": "Filter ({n})",
+    "categories": "Categories",
+    "statuses": "Statuses",
+    "teams": "Teams",
+    "branches": "Branches",
+    "openOnly": "Hide closed conversations",
+    "includeForm": "Include tickets created with the form",
+    "saveDefault": "Save as my default",
+    "savedDefault": "Saved — the chat console opens with this filter.",
+    "useDefault": "My default",
+    "clear": "Clear",
+    "empty": "No conversations match.",
+    "unclaimed": "New",
+    "waiting": "waiting {time}",
+    "claim": "Claim chat",
+    "claimAs": "Claim for team…",
+    "unclaimedHint": "Waiting for an internal agent to claim this chat.",
+    "pickConversation": "Select a conversation",
+    "pickConversationHint": "New chats appear in “Unclaimed”. Claim one to reply; set the status when the conversation ends."
   }
 }

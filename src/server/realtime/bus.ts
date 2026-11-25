@@ -36,6 +36,8 @@ export const rooms = {
   user: (id: string) => `user:${id}`,
   ticket: (id: string) => `ticket:${id}`,
   ticketInternal: (id: string) => `ticket:${id}:internal`,
+  /** Internal staff with chat.queue: signals about new / claimed / updated chat cases. */
+  chatQueue: "chat-queue",
 };
 
 /** Per-transaction queues so events are only emitted after COMMIT (see db-tx.ts). */

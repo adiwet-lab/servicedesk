@@ -5,6 +5,8 @@ import type { PrismaClient } from "@prisma/client";
 import type { Actor } from "@/server/authz/actor";
 import { canReadInternalNotes } from "@/server/authz/messages";
 import { ticketScopeWhere } from "@/server/authz/scope";
+import { isVendor } from "@/server/authz/actor";
+import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { registerEmitter, rooms } from "./bus";
 import { actorForIdentity, identityFromCookie, type SocketIdentity } from "./auth";
 
@@ -78,6 +80,9 @@ export function createRealtimeServer(httpServer: HttpServer, opts: RealtimeOptio
   io.on("connection", (socket) => {
     const data = socket.data as SocketData;
     void socket.join(rooms.user(data.actorId));
+    void loadActor(socket).then((actor) => {
+      if (actor && !isVendor(actor) && actor.permissions.has(P.CHAT_QUEUE)) void socket.join(rooms.chatQueue);
+    });
 
     const revalidate = setInterval(async () => {
       if (!(await loadActor(socket))) {

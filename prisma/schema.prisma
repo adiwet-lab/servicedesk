@@ -70,6 +70,12 @@ enum TaskStatus {
   CANCELLED
 }
 
+/// Where a ticket was opened. CHAT = guided chat in the portal (Phase 9); room for LINE later.
+enum TicketChannel {
+  FORM
+  CHAT
+}
+
 enum MessageType {
   PUBLIC
   INTERNAL
@@ -316,6 +322,7 @@ model User {
   approvalSteps        ApprovalStep[]     @relation("ApprovalStepApprover")
   approvalFallbacks    ApprovalStep[]     @relation("ApprovalStepFallback")
   ticketApprovals      TicketApproval[]   @relation("TicketApprover")
+  preferences          UserPreference[]
   apiTokens            ApiToken[]         @relation("ApiTokenCreator")
 
   @@unique([tenantId, entraObjectId])
@@ -573,6 +580,7 @@ model Ticket {
   assignedAgentId     String?
   assignedAgent       User?                  @relation("TicketAgent", fields: [assignedAgentId], references: [id])
   isConfidential      Boolean                @default(false)
+  channel             TicketChannel          @default(FORM)
   waitingReason       String?
   resolutionSummary   String?
   // SLA (Phase 4 computes these; Phase 1 stores targets from profile on create)
@@ -629,6 +637,7 @@ model Ticket {
 
   @@index([statusId])
   @@index([requesterId])
+  @@index([channel, assignedAgentId])
   @@index([ownerTeamId])
   @@index([assignedAgentId])
   @@index([departmentId])
@@ -1156,4 +1165,15 @@ model ApiToken {
   createdById  String
   createdBy    User      @relation("ApiTokenCreator", fields: [createdById], references: [id])
   createdAt    DateTime  @default(now())
+}
+
+/// Per-user settings (e.g. the saved chat-queue filter, key "chat.filter").
+model UserPreference {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
 }

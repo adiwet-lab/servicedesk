@@ -1,14 +1,7 @@
-import { getTranslations } from "next-intl/server";
-import { requireActor } from "@/server/auth/get-actor";
-import { ChatInbox } from "@/components/chat/chat-inbox";
-import { pageTitle } from "@/i18n/metadata";
+import { redirect } from "next/navigation";
 
-export const generateMetadata = pageTitle("messages");
-
+/** The Messages inbox became the chat (Phase 9). Kept for old links and notifications. */
 export default async function MessagesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const actor = await requireActor();
-  return ChatInbox({
-    actor, base: "/messages", ticketBase: "/tickets", title: (await getTranslations("pageTitle"))("messages"), mineOnly: true,
-    description: (await getTranslations("chat"))("inboxMineDesc"), params: await searchParams,
-  });
+  const p = await searchParams;
+  redirect(p.t ? `/chat?t=${encodeURIComponent(p.t)}` : "/chat");
 }
