@@ -3,6 +3,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 /** Right-hand drawer panel built on Radix Dialog (shadcn "Sheet"). */
 export const Sheet = DialogPrimitive.Root;
@@ -10,6 +11,7 @@ export const SheetTrigger = DialogPrimitive.Trigger;
 export const SheetClose = DialogPrimitive.Close;
 
 export function SheetContent({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) {
+  const tcfg = useTranslations("cfg");
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
@@ -18,7 +20,7 @@ export function SheetContent({ className, children, ...props }: React.ComponentP
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Close">
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label={tcfg("close")}>
           <X className="size-4" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

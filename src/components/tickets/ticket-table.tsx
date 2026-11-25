@@ -2,7 +2,10 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Lock, MessageSquare, TicketX } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/misc";
-import { formatAging, formatDateTime } from "@/lib/utils";
+import { useLocale, useTranslations } from "next-intl";
+import { makeFormat } from "@/lib/format";
+import { ln } from "@/lib/localized";
+import type { Locale } from "@/i18n/config";
 import type { TicketListRow } from "@/server/services/tickets";
 import { PriorityBadge, SlaBadge, StatusBadge } from "./badges";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +40,11 @@ export function TicketTable({
   /** Unread chat messages per ticket id. */
   unread?: Record<string, number>;
 }) {
+  const tt = useTranslations("ticketTable");
+  const locale = useLocale() as Locale;
+  const f = makeFormat(locale);
   if (rows.length === 0) {
-    return <EmptyState icon={<TicketX />} title="No tickets found" description="Try adjusting the filters or search terms." />;
+    return <EmptyState icon={<TicketX />} title={tt("emptyTitle")} description={tt("emptyDescription")} />;
   }
   const now = new Date();
   return (
@@ -46,18 +52,18 @@ export function TicketTable({
       <Table data-testid="ticket-table">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <SortHead label="Ticket" field="number" base={base} params={params} />
-            <SortHead label="Subject" field="subject" base={base} params={params} />
-            <TableHead>Category</TableHead>
-            <TableHead>Requester</TableHead>
-            <TableHead>Dept / Branch</TableHead>
-            <SortHead label="Priority" field="priority" base={base} params={params} />
-            <SortHead label="Status" field="status" base={base} params={params} />
-            <TableHead>Team / Agent</TableHead>
-            <SortHead label="Created" field="createdAt" base={base} params={params} />
-            <SortHead label="Updated" field="updatedAt" base={base} params={params} />
-            <TableHead>Aging</TableHead>
-            <SortHead label="SLA" field="resolutionDueAt" base={base} params={params} />
+            <SortHead label={tt("ticket")} field="number" base={base} params={params} />
+            <SortHead label={tt("subject")} field="subject" base={base} params={params} />
+            <TableHead>{tt("category")}</TableHead>
+            <TableHead>{tt("requester")}</TableHead>
+            <TableHead>{tt("deptBranch")}</TableHead>
+            <SortHead label={tt("priority")} field="priority" base={base} params={params} />
+            <SortHead label={tt("status")} field="status" base={base} params={params} />
+            <TableHead>{tt("teamAgent")}</TableHead>
+            <SortHead label={tt("created")} field="createdAt" base={base} params={params} />
+            <SortHead label={tt("updated")} field="updatedAt" base={base} params={params} />
+            <TableHead>{tt("aging")}</TableHead>
+            <SortHead label={tt("sla")} field="resolutionDueAt" base={base} params={params} />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -68,42 +74,42 @@ export function TicketTable({
                 <TableCell className="font-mono text-xs whitespace-nowrap">
                   <Link href={`${detailBase}/${t.number}`} className="font-semibold text-primary hover:underline">{t.number}</Link>
                   {(unread[t.id] ?? 0) > 0 && (
-                    <Link href={`${detailBase}/${t.number}?tab=chat`} className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white" title={`${unread[t.id]} unread message(s)`} data-testid="row-unread">
+                    <Link href={`${detailBase}/${t.number}?tab=chat`} className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white" title={tt("unreadMessages", { count: unread[t.id] ?? 0 })} data-testid="row-unread">
                       <MessageSquare className="size-2.5" />{unread[t.id]}
                     </Link>
                   )}
                 </TableCell>
                 <TableCell className="max-w-72">
                   <Link href={`${detailBase}/${t.number}`} className="line-clamp-2 font-medium hover:underline">
-                    {t.isConfidential && <Lock className="mr-1 inline size-3 text-amber-600" aria-label="Confidential" />}
+                    {t.isConfidential && <Lock className="mr-1 inline size-3 text-amber-600" aria-label={tt("confidential")} />}
                     {t.subject}
                   </Link>
                 </TableCell>
                 <TableCell className="text-xs whitespace-nowrap">
-                  <div>{t.category.name}</div>
-                  <div className="text-muted-foreground">{t.subcategory?.name}</div>
+                  <div>{ln(t.category, locale)}</div>
+                  <div className="text-muted-foreground">{t.subcategory ? ln(t.subcategory, locale) : null}</div>
                 </TableCell>
                 <TableCell className="text-xs whitespace-nowrap">{t.requester.displayName}</TableCell>
                 <TableCell className="text-xs whitespace-nowrap">
-                  <div>{t.department?.name ?? "—"}</div>
-                  <div className="text-muted-foreground">{t.branch?.name}</div>
+                  <div>{t.department ? ln(t.department, locale) : "—"}</div>
+                  <div className="text-muted-foreground">{t.branch ? ln(t.branch, locale) : null}</div>
                 </TableCell>
                 <TableCell><PriorityBadge priority={t.priority} /></TableCell>
                 <TableCell>
                   <div className="flex flex-col items-start gap-1">
                     <StatusBadge status={t.status} />
-                    {t.approvalStatus === "PENDING" && <Badge variant="warning" data-testid="approval-badge">Awaiting approval</Badge>}
-                    {t.approvalStatus === "REJECTED" && <Badge variant="destructive">Not approved</Badge>}
-                    {t.isMajorIncident && t.majorIncidentStatus !== "RESOLVED" && <Badge variant="destructive">Major</Badge>}
+                    {t.approvalStatus === "PENDING" && <Badge variant="warning" data-testid="approval-badge">{tt("awaitingApproval")}</Badge>}
+                    {t.approvalStatus === "REJECTED" && <Badge variant="destructive">{tt("notApproved")}</Badge>}
+                    {t.isMajorIncident && t.majorIncidentStatus !== "RESOLVED" && <Badge variant="destructive">{tt("major")}</Badge>}
                   </div>
                 </TableCell>
                 <TableCell className="text-xs whitespace-nowrap">
-                  <div>{t.ownerTeam?.name ?? <span className="text-muted-foreground">Unrouted</span>}</div>
-                  <div className="text-muted-foreground">{t.assignedAgent?.displayName ?? "Unassigned"}</div>
+                  <div>{t.ownerTeam ? ln(t.ownerTeam, locale) : <span className="text-muted-foreground">{tt("unrouted")}</span>}</div>
+                  <div className="text-muted-foreground">{t.assignedAgent?.displayName ?? tt("unassigned")}</div>
                 </TableCell>
-                <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{formatDateTime(t.createdAt)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{formatDateTime(t.updatedAt)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{formatAging(t.createdAt, t.closedAt ?? t.resolvedAt ?? now)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{f.dateTime(t.createdAt)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{f.dateTime(t.updatedAt)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{f.aging(t.createdAt, t.closedAt ?? t.resolvedAt ?? now)}</TableCell>
                 <TableCell><SlaBadge ticket={t} /></TableCell>
               </TableRow>
             );
@@ -111,13 +117,13 @@ export function TicketTable({
         </TableBody>
       </Table>
       <div className="flex items-center justify-between border-t px-3 py-3 text-sm text-muted-foreground">
-        <span>{total} ticket{total === 1 ? "" : "s"} · page {page} of {pages}</span>
+        <span>{tt("pager", { total, page, pages })}</span>
         <div className="flex gap-1">
           {page > 1 ? (
-            <Link className="rounded-md border p-1.5 hover:bg-accent" href={href(base, params, { page: String(page - 1) })} aria-label="Previous page"><ChevronLeft className="size-4" /></Link>
+            <Link className="rounded-md border p-1.5 hover:bg-accent" href={href(base, params, { page: String(page - 1) })} aria-label={tt("previous")}><ChevronLeft className="size-4" /></Link>
           ) : <span className="rounded-md border p-1.5 opacity-40"><ChevronLeft className="size-4" /></span>}
           {page < pages ? (
-            <Link className="rounded-md border p-1.5 hover:bg-accent" href={href(base, params, { page: String(page + 1) })} aria-label="Next page"><ChevronRight className="size-4" /></Link>
+            <Link className="rounded-md border p-1.5 hover:bg-accent" href={href(base, params, { page: String(page + 1) })} aria-label={tt("next")}><ChevronRight className="size-4" /></Link>
           ) : <span className="rounded-md border p-1.5 opacity-40"><ChevronRight className="size-4" /></span>}
         </div>
       </div>

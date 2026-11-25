@@ -60,13 +60,13 @@ export async function enqueueTeamsCard(tx: Tx, input: {
   title: string; text?: string; extraFacts?: [string, string | null | undefined][]; tone?: CardInput["tone"];
 }) {
   if (!input.teamId) return;
-  const team = await tx.supportTeam.findUnique({ where: { id: input.teamId }, select: { id: true, name: true, teamsWebhookEnc: true, isActive: true } });
+  const team = await tx.supportTeam.findUnique({ where: { id: input.teamId }, select: { id: true, name: true, nameTh: true, teamsWebhookEnc: true, isActive: true } });
   if (!team?.teamsWebhookEnc || !team.isActive) return;
   const settings = await getSettings(tx);
   if (!settings["integrations.teams.events"].includes(input.event)) return;
   const t = await tx.ticket.findUniqueOrThrow({
     where: { id: input.ticketId },
-    select: { id: true, number: true, subject: true, isConfidential: true, priority: { select: { code: true, name: true } }, status: { select: { name: true } } },
+    select: { id: true, number: true, subject: true, isConfidential: true, priority: { select: { code: true, name: true, nameTh: true } }, status: { select: { name: true, nameTh: true } } },
   });
   const card = buildAdaptiveCard({
     title: input.title,

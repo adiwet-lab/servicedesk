@@ -14,17 +14,23 @@ import { PageHeader } from "@/components/ui/misc";
 import { TicketFilters } from "./ticket-filters";
 import { TicketTable } from "./ticket-table";
 import { prisma } from "@/server/db";
+import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
+import type { Locale } from "@/i18n/config";
 
-const AGE_LABEL: Record<string, string> = { "0-1": "0–1 day", "2-3": "2–3 days", "4-7": "4–7 days", "8-14": "8–14 days", "15+": "> 14 days" };
+const AGE_KEYS = ["0-1", "2-3", "4-7", "8-14", "15+"] as const;
 
-async function resolveDrillNames(drill: { k: string; v: string }[]): Promise<Record<string, string>> {
+async function resolveDrillNames(drill: { k: string; v: string }[], locale: Locale): Promise<Record<string, string>> {
+  const t = await getTranslations("ticketList");
   const out: Record<string, string> = {};
+  const nm = (r: { name: string; nameTh: string | null } | null) => (r ? ln(r, locale) : null);
   for (const { k, v } of drill) {
-    if (k === "aging") out[k] = AGE_LABEL[v] ?? v;
-    else if (k === "agent") out[k] = v === "none" ? "Unassigned" : (await prisma.user.findUnique({ where: { id: v }, select: { displayName: true } }))?.displayName ?? v;
-    else if (k === "branch") out[k] = (await prisma.branch.findUnique({ where: { id: v }, select: { name: true } }))?.name ?? v;
-    else if (k === "department") out[k] = (await prisma.department.findUnique({ where: { id: v }, select: { name: true } }))?.name ?? v;
-    else if (k === "subcategory") out[k] = (await prisma.category.findUnique({ where: { id: v }, select: { name: true } }))?.name ?? v;
+    if (k === "aging") out[k] = (AGE_KEYS as readonly string[]).includes(v) ? t(`age.${v as (typeof AGE_KEYS)[number]}`) : v;
+    else if (k === "agent") out[k] = v === "none" ? t("unassigned") : (await prisma.user.findUnique({ where: { id: v }, select: { displayName: true } }))?.displayName ?? v;
+    else if (k === "branch") out[k] = nm(await prisma.branch.findUnique({ where: { id: v }, select: { name: true, nameTh: true } })) ?? v;
+    else if (k === "department") out[k] = nm(await prisma.department.findUnique({ where: { id: v }, select: { name: true, nameTh: true } })) ?? v;
+    else if (k === "subcategory") out[k] = nm(await prisma.category.findUnique({ where: { id: v }, select: { name: true, nameTh: true } })) ?? v;
     else if (k === "company") out[k] = (await prisma.company.findUnique({ where: { id: v }, select: { name: true } }))?.name ?? v;
   }
   return out;
@@ -39,21 +45,22 @@ export async function TicketListPage({ actor, view, title, description, base, pa
   const unread = await unreadCounts(actor, result.rows.map((r) => r.id));
   const hidden: Record<string, string> = admin ? { view } : {};
   // Dashboard drill-down parameters are kept across filter changes and shown as removable chips.
-  const DRILL: Record<string, string> = { from: "Created from", to: "Created to", aging: "Age", agent: "Agent", branch: "Branch", department: "Department", subcategory: "Subcategory", company: "Company" };
-  const drill = Object.entries(DRILL).filter(([k]) => params[k]).map(([k, label]) => ({ k, label, v: params[k]! }));
+  const [t, locale] = await Promise.all([getTranslations("ticketList"), currentLocale()]);
+  const DRILL = ["from", "to", "aging", "agent", "branch", "department", "subcategory", "company"] as const;
+  const drill = DRILL.filter((k) => params[k]).map((k) => ({ k, label: t(`drill.${k}`), v: params[k]! }));
   for (const d of drill) hidden[d.k] = d.v;
-  const drillNames = drill.length ? await resolveDrillNames(drill) : {};
+  const drillNames = drill.length ? await resolveDrillNames(drill, locale) : {};
   return (
     <div>
       <PageHeader title={title} description={description}
-        actions={can(actor, P.TICKET_CREATE) && <Button asChild><Link href="/tickets/new"><PlusCircle /> Create ticket</Link></Button>} />
+        actions={can(actor, P.TICKET_CREATE) && <Button asChild><Link href="/tickets/new"><PlusCircle /> {t("createTicket")}</Link></Button>} />
       {drill.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="drill-filters">
-          <span className="text-muted-foreground">Filtered from dashboard:</span>
+          <span className="text-muted-foreground">{t("filteredFrom")}</span>
           {drill.map((d) => {
             const rest = new URLSearchParams(Object.entries(params).filter(([k, v]) => k !== d.k && k !== "page" && v) as [string, string][]);
             return (
-              <Link key={d.k} href={`${base}?${rest}`} className="rounded-full border bg-card px-2.5 py-0.5 hover:bg-accent" title="Remove filter">
+              <Link key={d.k} href={`${base}?${rest}`} className="rounded-full border bg-card px-2.5 py-0.5 hover:bg-accent" title={t("removeFilter")}>
                 {d.label}: <span className="font-medium">{drillNames[d.k] ?? d.v}</span> ×
               </Link>
             );

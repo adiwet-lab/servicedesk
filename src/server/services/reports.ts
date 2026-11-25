@@ -41,9 +41,9 @@ export async function runReport(actor: Actor, type: string, f: AnalyticsFilters,
     const rows = await prisma.ticket.findMany({
       where: buildWhere(actor, f, "createdAt", now), take: limit + 1, orderBy: { createdAt: "asc" },
       include: {
-        category: { select: { name: true } }, subcategory: { select: { name: true } }, priority: { select: { code: true } },
-        status: { select: { name: true, kind: true } }, requester: { select: { displayName: true, email: true } }, company: { select: { name: true } },
-        department: { select: { name: true } }, branch: { select: { name: true } }, ownerTeam: { select: { name: true } }, assignedAgent: { select: { displayName: true } },
+        category: { select: { name: true, nameTh: true } }, subcategory: { select: { name: true, nameTh: true } }, priority: { select: { code: true } },
+        status: { select: { name: true, nameTh: true, kind: true } }, requester: { select: { displayName: true, email: true } }, company: { select: { name: true } },
+        department: { select: { name: true, nameTh: true } }, branch: { select: { name: true, nameTh: true } }, ownerTeam: { select: { name: true, nameTh: true } }, assignedAgent: { select: { displayName: true } },
       },
     });
     const truncated = rows.length > limit;
@@ -104,7 +104,7 @@ export async function runReport(actor: Actor, type: string, f: AnalyticsFilters,
     prisma.ticket.groupBy({ by: ["categoryId", "subcategoryId"], where: buildWhere(actor, f, "createdAt", now), _count: { _all: true } }),
     prisma.ticket.findMany({ where: buildWhere(actor, f, "resolvedAt", now), take: MAX_REPORT_ROWS,
       select: { categoryId: true, subcategoryId: true, createdAt: true, resolvedAt: true, resolutionTargetMin: true, resolutionBreached: true } }),
-    prisma.category.findMany({ select: { id: true, name: true } }),
+    prisma.category.findMany({ select: { id: true, name: true, nameTh: true } }),
   ]);
   const name = new Map(cats.map((c) => [c.id, c.name]));
   const keys = new Set([...created.map((c) => `${c.categoryId}|${c.subcategoryId ?? ""}`), ...resolved.map((r) => `${r.categoryId}|${r.subcategoryId ?? ""}`)]);

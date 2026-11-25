@@ -67,14 +67,15 @@ export function periodKeys(from: Date, to: Date, g: Granularity): string[] {
   return keys;
 }
 
-export function periodLabel(key: string, g: Granularity): string {
+export function periodLabel(key: string, g: Granularity, locale: "th" | "en" = "en"): string {
+  const loc = locale === "th" ? "th-TH" : "en-GB";
   if (g === "month") {
     const [y, m] = key.split("-");
-    return new Date(Date.UTC(Number(y), Number(m) - 1, 1)).toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
+    return new Date(Date.UTC(Number(y), Number(m) - 1, 1)).toLocaleDateString(loc, { month: "short", year: "2-digit", timeZone: "UTC" });
   }
   const d = new Date(`${key}T00:00:00Z`);
-  const s = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
-  return g === "week" ? `wk ${s}` : s;
+  const s = d.toLocaleDateString(loc, { day: "2-digit", month: "short", timeZone: "UTC" });
+  return g === "week" ? (locale === "th" ? `สัปดาห์ ${s}` : `wk ${s}`) : s;
 }
 
 /** Percentage with one decimal; null when there is nothing to measure. */

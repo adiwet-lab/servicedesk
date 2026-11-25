@@ -13,7 +13,7 @@ export async function Shell({ actor, portal, children }: { actor: Actor; portal:
   const [unread, unreadMessages, roles, tenant] = await Promise.all([
     unreadCount(prisma, actor),
     totalUnreadMessages(actor),
-    prisma.role.findMany({ where: { code: { in: actor.roleCodes } }, select: { name: true } }),
+    prisma.role.findMany({ where: { code: { in: actor.roleCodes } }, select: { code: true, name: true } }),
     prisma.tenant.findUnique({ where: { id: actor.tenantId }, select: { name: true } }),
   ]);
   async function signOutAction() {
@@ -24,7 +24,7 @@ export async function Shell({ actor, portal, children }: { actor: Actor; portal:
     <Suspense>
       <AppShell
         nav={portal === "admin" ? adminNav(actor) : portalNav(actor)}
-        user={{ name: actor.displayName, email: actor.email, roles: roles.map((r) => r.name), tenant: tenant?.name ?? "", vendor: actor.tenantType === "VENDOR" }}
+        user={{ name: actor.displayName, email: actor.email, roles: roles.map((r) => ({ code: r.code, name: r.name })), tenant: tenant?.name ?? "", vendor: actor.tenantType === "VENDOR" }}
         unread={unread}
         unreadMessages={unreadMessages}
         portal={portal}

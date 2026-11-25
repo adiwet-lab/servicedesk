@@ -6,12 +6,14 @@ import { dateWindow, getFilterOptions, parseAnalyticsFilters, type AnalyticsFilt
 import { PageHeader } from "@/components/ui/misc";
 import { DashboardTabs, dashboardsFor, type DashboardKey } from "./dashboard-tabs";
 import { FilterBar } from "./filter-bar";
+import { currentLocale } from "@/i18n/server";
 
 export async function loadDashboard(actor: Actor, key: DashboardKey, params: Record<string, string | undefined>) {
   if (!canAny(actor, [P.DASHBOARD_SUPPORT, P.DASHBOARD_MANAGEMENT, P.TICKET_READ_ALL])) notFound();
   if (!dashboardsFor(actor).some((d) => d.key === key)) notFound();
-  const filters = parseAnalyticsFilters(params);
-  const options = await getFilterOptions(actor);
+  const locale = await currentLocale();
+  const filters = parseAnalyticsFilters(params, locale);
+  const options = await getFilterOptions(actor, locale);
   return { filters, options, window: dateWindow(filters) };
 }
 

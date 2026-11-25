@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { ArrowRightLeft, ChevronDown, Upload, UserPlus } from "lucide-react";
 import { assignTicketAction, changeStatusAction, teamAgentsAction, uploadAttachmentsAction } from "@/server/actions/tickets";
@@ -11,6 +12,7 @@ import { Alert, Field } from "@/components/ui/misc";
 interface Transition { id: string; name: string; kind: string; color: string; requiresReason: boolean }
 
 export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { ticketId: string; transitions: Transition[]; blockingTasks?: { number: string; title: string }[] }) {
+  const tr = useTranslations("ticketActions");
   const [target, setTarget] = useState<Transition | null>(null);
   const [state, action, pending] = useActionState(changeStatusAction, null);
   useEffect(() => { if (state?.ok) setTarget(null); }, [state]);
@@ -21,7 +23,7 @@ export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { t
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button data-testid="change-status">Change status <ChevronDown /></Button>
+          <Button data-testid="change-status">{tr("changeStatus")} <ChevronDown /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {transitions.map((t) => (
@@ -34,10 +36,10 @@ export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { t
       <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change status to “{target?.name}”</DialogTitle>
+            <DialogTitle>{tr("changeStatusTitle", { name: target?.name ?? "" })}</DialogTitle>
             <DialogDescription>
-              {target?.kind === "RESOLVED" ? "Describe how the issue was resolved. The requester will be notified." :
-                target?.requiresReason ? "A reason is required for this status." : "Confirm the status change."}
+              {target?.kind === "RESOLVED" ? tr("resolveHint") :
+                target?.requiresReason ? tr("reasonRequired") : tr("confirmChange")}
             </DialogDescription>
           </DialogHeader>
           <form action={action} className="space-y-4">
@@ -46,24 +48,24 @@ export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { t
             {state && !state.ok && <Alert variant="destructive">{state.error}</Alert>}
             {target?.kind === "RESOLVED" && blockingTasks.length > 0 && (
               <Alert variant="warning">
-                <strong>Required tasks still open:</strong>
+                <strong>{tr("requiredTasksOpen")}</strong>
                 <ul className="mt-1 list-disc pl-5">{blockingTasks.map((b) => <li key={b.number}>{b.number} — {b.title}</li>)}</ul>
               </Alert>
             )}
             {target?.kind === "RESOLVED" ? (
-              <Field label="Resolution summary" htmlFor="resolutionSummary" required>
+              <Field label={tr("resolutionSummary")} htmlFor="resolutionSummary" required>
                 <Textarea id="resolutionSummary" name="resolutionSummary" required minLength={3} rows={5} />
               </Field>
             ) : target && needsDialog(target) ? (
-              <Field label={target.kind === "WAITING" ? "Waiting reason" : "Reason"} htmlFor="reason" required>
+              <Field label={target.kind === "WAITING" ? tr("waitingReason") : tr("reason")} htmlFor="reason" required>
                 <Textarea id="reason" name="reason" required rows={4} />
               </Field>
             ) : (
-              <Field label="Comment (optional)" htmlFor="reason"><Textarea id="reason" name="reason" rows={3} /></Field>
+              <Field label={tr("commentOptional")} htmlFor="reason"><Textarea id="reason" name="reason" rows={3} /></Field>
             )}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setTarget(null)}>Cancel</Button>
-              <Button type="submit" disabled={pending} data-testid="confirm-status">{pending ? "Saving…" : "Confirm"}</Button>
+              <Button type="button" variant="outline" onClick={() => setTarget(null)}>{tr("cancel")}</Button>
+              <Button type="submit" disabled={pending} data-testid="confirm-status">{pending ? tr("saving") : tr("confirm")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -76,6 +78,7 @@ export function AssignDialog({ ticketId, teams, currentTeamId, currentAgentId, c
   ticketId: string; teams: { id: string; name: string }[]; currentTeamId: string | null; currentAgentId: string | null;
   canTransfer: boolean; initialAgents: { id: string; displayName: string }[];
 }) {
+  const tr = useTranslations("ticketActions");
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState(currentTeamId ?? "");
   const [agents, setAgents] = useState(initialAgents);
@@ -86,17 +89,17 @@ export function AssignDialog({ ticketId, teams, currentTeamId, currentAgentId, c
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)} data-testid="assign-button"><UserPlus /> Assign</Button>
+      <Button variant="outline" onClick={() => setOpen(true)} data-testid="assign-button"><UserPlus /> {tr("assign")}</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign ticket</DialogTitle>
-            <DialogDescription>Every assignment change is recorded in the ticket history.</DialogDescription>
+            <DialogTitle>{tr("assignTicket")}</DialogTitle>
+            <DialogDescription>{tr("assignHint")}</DialogDescription>
           </DialogHeader>
           <form action={action} className="space-y-4">
             <input type="hidden" name="ticketId" value={ticketId} />
             {state && !state.ok && <Alert variant="destructive">{state.error}</Alert>}
-            <Field label="Support team" htmlFor="teamId" hint={canTransfer ? "Changing the team transfers the ticket" : "You can assign within the current team"}>
+            <Field label={tr("supportTeam")} htmlFor="teamId" hint={canTransfer ? tr("transferHint") : tr("assignWithinHint")}>
               <NativeSelect id="teamId" name="teamId" value={teamId} disabled={!canTransfer}
                 onChange={(e) => {
                   const id = e.target.value;
@@ -107,18 +110,18 @@ export function AssignDialog({ ticketId, teams, currentTeamId, currentAgentId, c
               </NativeSelect>
               {!canTransfer && <input type="hidden" name="teamId" value={teamId} />}
             </Field>
-            <Field label="Agent" htmlFor="agentId">
+            <Field label={tr("agent")} htmlFor="agentId">
               <NativeSelect id="agentId" name="agentId" defaultValue={transferring ? "" : currentAgentId ?? ""} key={teamId} disabled={loading}>
-                <option value="">Unassigned (team queue)</option>
+                <option value="">{tr("unassignedQueue")}</option>
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.displayName}</option>)}
               </NativeSelect>
             </Field>
-            <Field label={transferring ? "Transfer reason" : "Reason (optional)"} htmlFor="assign-reason" required={transferring}>
+            <Field label={transferring ? tr("transferReason") : tr("reasonOptional")} htmlFor="assign-reason" required={transferring}>
               <Input id="assign-reason" name="reason" required={transferring} maxLength={1000} />
             </Field>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={pending}>{transferring ? <><ArrowRightLeft /> Transfer</> : "Save"}</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>{tr("cancel")}</Button>
+              <Button type="submit" disabled={pending}>{transferring ? <><ArrowRightLeft /> {tr("transfer")}</> : tr("save")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -128,16 +131,17 @@ export function AssignDialog({ ticketId, teams, currentTeamId, currentAgentId, c
 }
 
 export function AttachmentUploader({ ticketId, allowed }: { ticketId: string; allowed: string[] }) {
+  const tr = useTranslations("ticketActions");
   const [state, action, pending] = useActionState(uploadAttachmentsAction, null);
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="ticketId" value={ticketId} />
       <div className="flex items-center gap-2">
-        <input name="attachments" type="file" multiple accept={allowed.map((e) => `.${e}`).join(",")} className="text-sm file:mr-3 file:rounded-md file:border file:bg-card file:px-3 file:py-1.5 file:text-sm" aria-label="Choose files" />
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}><Upload /> {pending ? "Uploading…" : "Upload"}</Button>
+        <input name="attachments" type="file" multiple accept={allowed.map((e) => `.${e}`).join(",")} className="text-sm file:mr-3 file:rounded-md file:border file:bg-card file:px-3 file:py-1.5 file:text-sm" aria-label={tr("chooseFiles")} />
+        <Button type="submit" size="sm" variant="secondary" disabled={pending}><Upload /> {pending ? tr("uploading") : tr("upload")}</Button>
       </div>
       {state && !state.ok && <p className="text-xs text-destructive">{state.error}</p>}
-      {state?.ok && <p className="text-xs text-success">Uploaded.</p>}
+      {state?.ok && <p className="text-xs text-success">{tr("uploaded")}</p>}
     </form>
   );
 }

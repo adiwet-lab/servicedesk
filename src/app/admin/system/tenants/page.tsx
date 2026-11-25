@@ -4,18 +4,20 @@ import { can } from "@/server/authz/guards";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { CrudPage } from "@/components/admin/crud-page";
 import { Alert } from "@/components/ui/misc";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = { title: "Microsoft Tenants" };
+export const generateMetadata = pageTitle("microsoftTenants");
 
 export default async function TenantsPage() {
+  const tsys = await getTranslations("sysadm");
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_TENANTS)) notFound();
   return CrudPage({
     actor, entity: "tenants",
     extra: (
       <Alert className="mb-4">
-        The app registration must be <strong>multi-tenant</strong> (“Accounts in any organizational directory”). Each external organization&apos;s
-        admin grants consent once; then add its Tenant ID here. Disabling a tenant blocks sign-in and ends existing sessions for all of its users.
+        {tsys.rich("tenantNote", { b: (c) => <strong>{c}</strong> })}
       </Alert>
     ),
   });

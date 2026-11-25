@@ -1,22 +1,21 @@
+import { useLocale, useTranslations } from "next-intl";
 import { ColorBadge, Badge } from "@/components/ui/badge";
+import { ln } from "@/lib/localized";
+import type { Locale } from "@/i18n/config";
 
-export function StatusBadge({ status }: { status: { name: string; color: string } }) {
-  return <ColorBadge color={status.color}>{status.name}</ColorBadge>;
+export function StatusBadge({ status }: { status: { name: string; nameTh?: string | null; color: string } }) {
+  const locale = useLocale() as Locale;
+  return <ColorBadge color={status.color}>{ln(status, locale)}</ColorBadge>;
 }
 
-export function PriorityBadge({ priority }: { priority: { code: string; name: string; color: string } }) {
-  return <ColorBadge color={priority.color}>{priority.code} · {priority.name}</ColorBadge>;
+export function PriorityBadge({ priority }: { priority: { code: string; name: string; nameTh?: string | null; color: string } }) {
+  const locale = useLocale() as Locale;
+  return <ColorBadge color={priority.color}>{priority.code} · {ln(priority, locale)}</ColorBadge>;
 }
 
 type SlaListState = "ON_TRACK" | "WARNING" | "BREACHED" | "MET" | "MET_LATE" | "PAUSED" | "NONE";
-const SLA_LABEL: Record<SlaListState, { label: string; variant: "success" | "warning" | "destructive" | "secondary" | "outline" }> = {
-  ON_TRACK: { label: "On Track", variant: "success" },
-  WARNING: { label: "Warning", variant: "warning" },
-  BREACHED: { label: "Breached", variant: "destructive" },
-  MET: { label: "Within SLA", variant: "success" },
-  MET_LATE: { label: "Completed Late", variant: "destructive" },
-  PAUSED: { label: "Paused", variant: "secondary" },
-  NONE: { label: "—", variant: "outline" },
+const SLA_VARIANT: Record<SlaListState, "success" | "warning" | "destructive" | "secondary" | "outline"> = {
+  ON_TRACK: "success", WARNING: "warning", BREACHED: "destructive", MET: "success", MET_LATE: "destructive", PAUSED: "secondary", NONE: "outline",
 };
 
 /**
@@ -37,8 +36,8 @@ export function listSlaState(t: {
 }
 
 export function SlaBadge({ ticket }: { ticket: Parameters<typeof listSlaState>[0]; warningPercent?: number }) {
+  const t = useTranslations("sla.state");
   const st = listSlaState(ticket);
-  const { label, variant } = SLA_LABEL[st];
   if (st === "NONE") return <span className="text-muted-foreground">—</span>;
-  return <Badge variant={variant}>{label}</Badge>;
+  return <Badge variant={SLA_VARIANT[st]}>{t(st)}</Badge>;
 }

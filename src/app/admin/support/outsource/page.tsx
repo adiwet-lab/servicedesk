@@ -8,11 +8,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, PageHeader } from "@/components/ui/misc";
-import { formatDate } from "@/lib/utils";
 
-export const metadata = { title: "Outsource Teams" };
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
+import { getFormat } from "@/i18n/server";
+
+export const generateMetadata = pageTitle("outsourceTeams");
 
 export default async function OutsourcePage() {
+  const tcfg = await getTranslations("cfg");
+  const fmt = await getFormat();
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_TEAMS)) notFound();
   const teams = await prisma.supportTeam.findMany({
@@ -22,28 +27,28 @@ export default async function OutsourcePage() {
   const soon = new Date(Date.now() + 14 * 86400000);
   return (
     <div className="space-y-5">
-      <PageHeader title="Outsource Teams" description="External vendor and outsource support teams, their members and access expiry." />
-      <Alert>External users sign in with their own Microsoft tenant, only see tickets owned by/assigned to their team, never see internal notes, and lose access automatically at their expiry date. Deactivate a user under User Management to cut access immediately.</Alert>
+      <PageHeader title={tcfg("outsourceTeams")} description={tcfg("externalVendorAndOutsourceSupportTeams")} />
+      <Alert>{tcfg("externalUsersSignInWithTheir")}</Alert>
       {teams.map((t) => (
         <Card key={t.id} className="overflow-hidden">
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-base">{t.name} <Badge variant="secondary" className="ml-1">{t.type}</Badge> {!t.isActive && <Badge variant="outline">Inactive</Badge>}</CardTitle>
-              <p className="text-sm text-muted-foreground">{t.tenant?.name ?? "No tenant linked"}</p>
+              <CardTitle className="text-base">{t.name} <Badge variant="secondary" className="ml-1">{t.type}</Badge> {!t.isActive && <Badge variant="outline">{tcfg("inactive")}</Badge>}</CardTitle>
+              <p className="text-sm text-muted-foreground">{t.tenant?.name ?? tcfg("noTenantLinked")}</p>
             </div>
-            <Link href={`/admin/support/teams/${t.id}`} className="text-sm text-primary hover:underline">Manage members</Link>
+            <Link href={`/admin/support/teams/${t.id}`} className="text-sm text-primary hover:underline">{tcfg("manageMembers")}</Link>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Member</TableHead><TableHead>Status</TableHead><TableHead>Access expires</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{tcfg("member")}</TableHead><TableHead>{tcfg("status")}</TableHead><TableHead>{tcfg("accessExpires")}</TableHead></TableRow></TableHeader>
               <TableBody>
                 {t.members.map((m) => {
                   const exp = m.user.accessExpiresAt;
                   return (
                     <TableRow key={m.userId}>
                       <TableCell><Link href={`/admin/system/users/${m.userId}`} className="font-medium hover:underline">{m.user.displayName}</Link><p className="text-xs text-muted-foreground">{m.user.email}</p></TableCell>
-                      <TableCell>{m.user.status === "ACTIVE" ? <Badge variant="success">Active</Badge> : <Badge variant="destructive">{m.user.status}</Badge>}</TableCell>
-                      <TableCell>{exp ? <Badge variant={exp < new Date() ? "destructive" : exp < soon ? "warning" : "secondary"}>{formatDate(exp)}</Badge> : <Badge variant="warning">No expiry set</Badge>}</TableCell>
+                      <TableCell>{m.user.status === "ACTIVE" ? <Badge variant="success">{tcfg("active")}</Badge> : <Badge variant="destructive">{m.user.status}</Badge>}</TableCell>
+                      <TableCell>{exp ? <Badge variant={exp < new Date() ? "destructive" : exp < soon ? "warning" : "secondary"}>{fmt.date(exp)}</Badge> : <Badge variant="warning">{tcfg("noExpirySet")}</Badge>}</TableCell>
                     </TableRow>
                   );
                 })}

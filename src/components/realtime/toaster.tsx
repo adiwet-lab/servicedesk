@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { createContext, useCallback, useContext, useState } from "react";
 import { Bell, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export interface Toast { id: number; title: string; body?: string | null; href?: string | null }
 const ToastCtx = createContext<{ push: (t: Omit<Toast, "id">) => void }>({ push: () => {} });
@@ -9,6 +10,7 @@ export const useToast = () => useContext(ToastCtx);
 
 let seq = 0;
 export function Toaster({ children }: { children: React.ReactNode }) {
+  const tr = useTranslations("realtime");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
   const push = useCallback((t: Omit<Toast, "id">) => {
@@ -27,7 +29,7 @@ export function Toaster({ children }: { children: React.ReactNode }) {
               {t.href ? <Link href={t.href} className="font-medium hover:underline" onClick={() => dismiss(t.id)}>{t.title}</Link> : <p className="font-medium">{t.title}</p>}
               {t.body && <p className="truncate text-muted-foreground">{t.body}</p>}
             </div>
-            <button onClick={() => dismiss(t.id)} aria-label="Dismiss"><X className="size-4 text-muted-foreground" /></button>
+            <button onClick={() => dismiss(t.id)} aria-label={tr("dismiss")}><X className="size-4 text-muted-foreground" /></button>
           </div>
         ))}
       </div>

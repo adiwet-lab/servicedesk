@@ -1,3 +1,4 @@
+import { thMiStatus } from "@/i18n/server-text";
 import { z } from "zod";
 import type { MajorIncidentStatus, Prisma } from "@prisma/client";
 import { IMPACT_LABEL, IMPACT_SCOPES, validateImpact } from "@/server/domain/impact";
@@ -125,10 +126,10 @@ export async function declareMajorIncident(actor: Actor, ticketId: string, raw: 
     const aud = await incidentAudience(tx, t.id);
     const leads = await teamMemberIds(tx, t.ownerTeamId, true);
     await notifyUsers(tx, [...aud.staff, ...leads], {
-      type: "MAJOR_INCIDENT", title: `Major incident declared: ${t.number}`, body: `${t.subject} — ${message.slice(0, 140)}`, ticketId: t.id, link: `/admin/tickets/${t.number}`,
+      type: "MAJOR_INCIDENT", key: "majorDeclared", params: { number: t.number, subject: t.subject, message: message.slice(0, 140) }, title: `Major incident declared: ${t.number}`, body: `${t.subject} — ${message.slice(0, 140)}`, ticketId: t.id, link: `/admin/tickets/${t.number}`,
     }, actor);
     await notifyUsers(tx, aud.requesters, {
-      type: "MAJOR_INCIDENT", title: `Known issue: ${t.subject}`, body: message.slice(0, 160), ticketId: t.id, link: `/tickets/${t.number}`,
+      type: "MAJOR_INCIDENT", key: "knownIssue", params: { subject: t.subject, message: message.slice(0, 160) }, title: `Known issue: ${t.subject}`, body: message.slice(0, 160), ticketId: t.id, link: `/tickets/${t.number}`,
     }, actor);
     await incidentCard(tx, t.id, `🚨 Major incident declared: ${t.number}`, message, "attention");
   });
@@ -153,8 +154,8 @@ export async function postIncidentUpdate(actor: Actor, ticketId: string, raw: un
       oldValue: t.majorIncidentStatus ? MI_STATUS_LABEL[t.majorIncidentStatus] : null, newValue: MI_STATUS_LABEL[u.status], reason: u.message } });
     await audit(tx, actor, { action: "MAJOR_INCIDENT_UPDATED", entityType: "Ticket", entityId: t.id, ticketId: t.id, newValue: u });
     const aud = await incidentAudience(tx, t.id);
-    await notifyUsers(tx, aud.staff, { type: "MAJOR_INCIDENT", title: `${t.number} · ${MI_STATUS_LABEL[u.status]}`, body: u.message.slice(0, 160), ticketId: t.id, link: `/admin/tickets/${t.number}` }, actor);
-    await notifyUsers(tx, aud.requesters, { type: "MAJOR_INCIDENT", title: `Update: ${t.subject} (${MI_STATUS_LABEL[u.status]})`, body: u.message.slice(0, 160), ticketId: t.id }, actor);
+    await notifyUsers(tx, aud.staff, { type: "MAJOR_INCIDENT", key: "incidentStatusStaff", params: { number: t.number, status: MI_STATUS_LABEL[u.status], statusTh: thMiStatus(u.status), message: u.message.slice(0, 160) }, title: `${t.number} · ${MI_STATUS_LABEL[u.status]}`, body: u.message.slice(0, 160), ticketId: t.id, link: `/admin/tickets/${t.number}` }, actor);
+    await notifyUsers(tx, aud.requesters, { type: "MAJOR_INCIDENT", key: "incidentStatusRequester", params: { subject: t.subject, status: MI_STATUS_LABEL[u.status], statusTh: thMiStatus(u.status), message: u.message.slice(0, 160) }, title: `Update: ${t.subject} (${MI_STATUS_LABEL[u.status]})`, body: u.message.slice(0, 160), ticketId: t.id }, actor);
     await incidentCard(tx, t.id, `Major incident ${t.number}: ${MI_STATUS_LABEL[u.status]}`, u.message, "warning");
   });
 }
@@ -174,7 +175,7 @@ export async function linkToIncident(actor: Actor, parentId: string, childRef: s
     await tx.ticketHistory.create({ data: { ticketId: parent.id, actorId: actor.id, action: "INCIDENT_LINKED", newValue: child.number } });
     await audit(tx, actor, { action: "INCIDENT_LINKED", entityType: "Ticket", entityId: parent.id, ticketId: parent.id, newValue: { child: child.number } });
     await notifyUsers(tx, [child.requesterId], {
-      type: "MAJOR_INCIDENT", title: `${child.number} is part of a known issue`, body: `We are working on ${parent.subject}. You will receive updates here.`, ticketId: child.id, link: `/tickets/${child.number}`,
+      type: "MAJOR_INCIDENT", key: "partOfKnownIssue", params: { number: child.number, subject: parent.subject }, title: `${child.number} is part of a known issue`, body: `We are working on ${parent.subject}. You will receive updates here.`, ticketId: child.id, link: `/tickets/${child.number}`,
     }, actor);
   });
 }
@@ -219,14 +220,14 @@ export async function resolveMajorIncident(actor: Actor, ticketId: string, raw: 
       oldValue: t.majorIncidentStatus ? MI_STATUS_LABEL[t.majorIncidentStatus] : null, newValue: "Resolved", reason: summary } });
     await audit(tx, actor, { action: "MAJOR_INCIDENT_RESOLVED", entityType: "Ticket", entityId: t.id, ticketId: t.id, newValue: { summary, cascade } });
     const aud = await incidentAudience(tx, t.id);
-    await notifyUsers(tx, [...aud.staff, ...aud.requesters], { type: "MAJOR_INCIDENT", title: `Resolved: ${t.subject}`, body: summary.slice(0, 160), ticketId: t.id }, actor);
+    await notifyUsers(tx, [...aud.staff, ...aud.requesters], { type: "MAJOR_INCIDENT", key: "incidentResolved", params: { subject: t.subject, summary: summary.slice(0, 160) }, title: `Resolved: ${t.subject}`, body: summary.slice(0, 160), ticketId: t.id }, actor);
     await incidentCard(tx, t.id, `✅ Major incident resolved: ${t.number}`, summary, "good");
   });
 
   if (cascade) {
     const children = await prisma.ticket.findMany({
       where: { parentIncidentId: t.id, deletedAt: null, status: { kind: { in: [...ACTIVE_KINDS] } } },
-      select: { ...ticketSlaSelect, number: true, statusId: true, requesterId: true, status: { select: { name: true } },
+      select: { ...ticketSlaSelect, number: true, statusId: true, requesterId: true, status: { select: { name: true, nameTh: true } },
         tasks: { select: { isRequired: true, status: true } } },
     });
     for (const c of children) {
@@ -244,7 +245,7 @@ export async function resolveMajorIncident(actor: Actor, ticketId: string, raw: 
         if (Object.keys(slaData).length) await tx.ticket.update({ where: { id: c.id }, data: slaData });
         await tx.ticketHistory.create({ data: { ticketId: c.id, actorId: actor.id, action: "STATUS_CHANGED", field: "status", oldValue: c.status.name, newValue: tr.toStatus.name, reason: `Resolved with major incident ${t.number}: ${summary}` } });
         await audit(tx, actor, { action: "STATUS_CHANGED", entityType: "Ticket", entityId: c.id, ticketId: c.id, oldValue: { status: c.status.name }, newValue: { status: tr.toStatus.name, viaIncident: t.number } });
-        await notifyUsers(tx, [c.requesterId], { type: "TICKET_RESOLVED", title: `${c.number} resolved`, body: summary.slice(0, 160), ticketId: c.id, link: `/tickets/${c.number}` }, actor);
+        await notifyUsers(tx, [c.requesterId], { type: "TICKET_RESOLVED", key: "childResolved", params: { number: c.number, summary: summary.slice(0, 160) }, title: `${c.number} resolved`, body: summary.slice(0, 160), ticketId: c.id, link: `/tickets/${c.number}` }, actor);
         resolved.push(c.number);
       });
     }
@@ -261,10 +262,10 @@ export async function getIncidentPanel(actor: Actor, ticketId: string) {
       id: true, number: true, isMajorIncident: true, majorIncidentStatus: true, majorDeclaredAt: true, impactScope: true, impactedUserCount: true,
       ownerTeamId: true, assignedAgentId: true, status: { select: { kind: true } }, isConfidential: true,
       majorDeclaredBy: { select: { displayName: true } },
-      impactedBranches: { select: { branch: { select: { id: true, name: true } } } },
+      impactedBranches: { select: { branch: { select: { id: true, name: true, nameTh: true } } } },
       parentIncident: { select: { id: true, number: true, subject: true, majorIncidentStatus: true } },
       incidentUpdates: { orderBy: { createdAt: "desc" }, include: { author: { select: { displayName: true } } } },
-      childTickets: { where: { AND: [ticketScopeWhere(actor), { deletedAt: null }] }, select: { id: true, number: true, subject: true, status: { select: { name: true, color: true, kind: true } }, requester: { select: { displayName: true } } }, orderBy: { createdAt: "asc" } },
+      childTickets: { where: { AND: [ticketScopeWhere(actor), { deletedAt: null }] }, select: { id: true, number: true, subject: true, status: { select: { name: true, nameTh: true, color: true, kind: true } }, requester: { select: { displayName: true } } }, orderBy: { createdAt: "asc" } },
       _count: { select: { childTickets: true } },
     },
   });
@@ -295,8 +296,8 @@ export async function listMajorIncidents(actor: Actor, opts: { includeResolved?:
     select: {
       id: true, number: true, subject: true, majorIncidentStatus: true, majorDeclaredAt: true, impactScope: true, impactedUserCount: true,
       resolutionDueAt: true, slaPausedAt: true, resolutionBreached: true,
-      priority: { select: { code: true, color: true } }, ownerTeam: { select: { name: true } }, assignedAgent: { select: { displayName: true } },
-      impactedBranches: { select: { branch: { select: { name: true } } } },
+      priority: { select: { code: true, color: true } }, ownerTeam: { select: { name: true, nameTh: true } }, assignedAgent: { select: { displayName: true } },
+      impactedBranches: { select: { branch: { select: { name: true, nameTh: true } } } },
       incidentUpdates: { orderBy: { createdAt: "desc" }, take: 1, select: { message: true, createdAt: true, status: true } },
       _count: { select: { childTickets: true } },
     },

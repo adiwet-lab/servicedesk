@@ -29,7 +29,7 @@ export async function getIntegrationsOverview(actor: Actor) {
   const [settings, tenants, teams, tokens, outbox, counts] = await Promise.all([
     getSettings(prisma),
     prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, type: true, entraTenantId: true, isActive: true, autoProvisionUsers: true, graphSyncEnabled: true, lastGraphSyncAt: true, lastGraphSyncResult: true } }),
-    prisma.supportTeam.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true, teamsWebhookEnc: true } }),
+    prisma.supportTeam.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, nameTh: true, type: true, teamsWebhookEnc: true } }),
     listApiTokens(actor),
     prisma.integrationOutbox.findMany({ orderBy: { createdAt: "desc" }, take: 30, select: { id: true, channel: true, event: true, target: true, status: true, attempts: true, lastError: true, createdAt: true, sentAt: true, nextAttemptAt: true } }),
     prisma.integrationOutbox.groupBy({ by: ["status"], _count: { _all: true } }),

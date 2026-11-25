@@ -33,6 +33,10 @@ export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 
 export interface NotifyInput {
   type: string;
+  /** i18n message (notify.<key>.title / .body), rendered in each viewer's language. */
+  key?: string;
+  params?: Record<string, string | number>;
+  /** English fallback (stored; shown for rows without a key). */
   title: string;
   body?: string;
   ticketId?: string;
@@ -74,7 +78,7 @@ export async function notifyUsers(db: Db, userIds: (string | null | undefined)[]
     if (existing.length) {
       await db.notification.updateMany({
         where: { id: { in: existing.map((e) => e.id) } },
-        data: { title: n.title, body: n.body, link: n.link, createdAt: new Date() },
+        data: { title: n.title, body: n.body, key: n.key ?? null, params: n.params ?? undefined, link: n.link, createdAt: new Date() },
       });
       const covered = new Set(existing.map((e) => e.userId));
       createFor = ids.filter((id) => !covered.has(id));
@@ -82,11 +86,11 @@ export async function notifyUsers(db: Db, userIds: (string | null | undefined)[]
   }
   if (createFor.length) {
     await db.notification.createMany({
-      data: createFor.map((userId) => ({ userId, type: n.type, title: n.title, body: n.body, ticketId: n.ticketId, link: n.link })),
+      data: createFor.map((userId) => ({ userId, type: n.type, title: n.title, body: n.body, key: n.key ?? null, params: n.params ?? undefined, ticketId: n.ticketId, link: n.link })),
     });
   }
   for (const userId of ids) {
-    queueEvent(db, { room: rooms.user(userId), event: "notify", payload: { type: n.type, title: n.title, ticketId: n.ticketId ?? null, link: n.link ?? null } });
+    queueEvent(db, { room: rooms.user(userId), event: "notify", payload: { type: n.type, title: n.title, key: n.key ?? null, params: n.params ?? null, ticketId: n.ticketId ?? null, link: n.link ?? null } });
   }
 }
 

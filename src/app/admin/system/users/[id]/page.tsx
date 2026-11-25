@@ -11,11 +11,16 @@ import { UserForm } from "@/components/admin/user-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
-import { formatDateTime } from "@/lib/utils";
 
-export const metadata = { title: "Edit User" };
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
+import { getFormat } from "@/i18n/server";
+
+export const generateMetadata = pageTitle("editUser");
 
 export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
+  const tsys = await getTranslations("sysadm");
+  const fmt = await getFormat();
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_USERS)) notFound();
   const { id } = await params;
@@ -24,11 +29,11 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
   const o = await getUserFormOptions();
   return (
     <div className="space-y-4">
-      <Link href="/admin/system/users" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> Users</Link>
+      <Link href="/admin/system/users" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> {tsys("users")}</Link>
       <PageHeader title={user.displayName}
-        description={<span className="flex flex-wrap items-center gap-2">{user.email} · {user.tenant.name} {user.tenant.type === "VENDOR" && <Badge variant="warning">External</Badge>}
-          <span className="font-mono text-xs">oid: {user.entraObjectId ?? "not linked"}</span> · last sign-in {formatDateTime(user.lastLoginAt)}</span>}
-        actions={<form action={revokeSessionsAction}><input type="hidden" name="userId" value={user.id} /><Button variant="outline" type="submit"><LogOut /> Sign out everywhere</Button></form>} />
+        description={<span className="flex flex-wrap items-center gap-2">{user.email} · {user.tenant.name} {user.tenant.type === "VENDOR" && <Badge variant="warning">{tsys("external")}</Badge>}
+          <span className="font-mono text-xs">{tsys("oidLine", { oid: user.entraObjectId ?? tsys("notLinked") })}</span> · {tsys("lastSignInAt", { at: fmt.dateTime(user.lastLoginAt) })}</span>}
+        actions={<form action={revokeSessionsAction}><input type="hidden" name="userId" value={user.id} /><Button variant="outline" type="submit"><LogOut /> {tsys("signOutEverywhere")}</Button></form>} />
       <UserForm
         userId={user.id}
         vendor={user.tenant.type === "VENDOR"}

@@ -1,3 +1,4 @@
+import { nameTh, thClock, thDuration } from "@/i18n/server-text";
 import { acquireLease, releaseLease } from "./lease";
 import { enqueueTeamsCard } from "@/server/integrations/teams";
 import { randomUUID } from "node:crypto";
@@ -107,7 +108,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
               await tx.ticket.update({ where: { id: t.id }, data: clock === "RESPONSE" ? { responseBreached: true } : { resolutionBreached: true } });
               await audit(tx, null, { action: "SLA_BREACHED", entityType: "Ticket", entityId: t.id, ticketId: t.id, newValue: { clock, dueAt: c.dueAt } });
               await notifyUsers(tx, await recipientsFor(tx, t), {
-                type: "SLA_BREACHED", title: `SLA breached (${label}): ${t.number}`, body: t.subject, ticketId: t.id, link,
+                type: "SLA_BREACHED", key: "slaBreached", params: { clock: label, clockTh: thClock(label), number: t.number, subject: t.subject }, title: `SLA breached (${label}): ${t.number}`, body: t.subject, ticketId: t.id, link,
               });
               await enqueueTeamsCard(tx, { teamId: t.ownerTeamId, event: "SLA_BREACHED", ticketId: t.id, title: `SLA breached (${label}): ${t.number}`,
                 extraFacts: [["Due", c.dueAt?.toISOString().slice(0, 16).replace("T", " ") + " UTC"]], tone: "attention" });
@@ -118,7 +119,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
               await tx.slaEvent.create({ data: { ticketId: t.id, clock, type: "WARNING", detail: `${c.elapsedPercent}% elapsed, ${formatClockMinutes(c.remainingMinutes ?? 0)} left` } });
               await audit(tx, null, { action: "SLA_WARNING", entityType: "Ticket", entityId: t.id, ticketId: t.id, newValue: { clock, elapsedPercent: c.elapsedPercent } });
               await notifyUsers(tx, await recipientsFor(tx, t), {
-                type: "SLA_WARNING", title: `SLA warning (${label}): ${t.number} — ${formatClockMinutes(c.remainingMinutes ?? 0)} left`, body: t.subject, ticketId: t.id, link,
+                type: "SLA_WARNING", key: "slaWarning", params: { clock: label, clockTh: thClock(label), number: t.number, left: formatClockMinutes(c.remainingMinutes ?? 0), leftTh: thDuration(c.remainingMinutes ?? 0), subject: t.subject }, title: `SLA warning (${label}): ${t.number} — ${formatClockMinutes(c.remainingMinutes ?? 0)} left`, body: t.subject, ticketId: t.id, link,
               });
             });
             r.warnings++;
@@ -139,7 +140,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
             const reason = `SLA escalation: ${rule.clock.toLowerCase()} at ${rule.atPercent}%`;
             if (rule.notifyTeamLead) {
               await notifyUsers(tx, await teamMemberIds(tx, current.ownerTeamId, true), {
-                type: "TICKET_ESCALATED", title: `${reason} — ${t.number}`, body: t.subject, ticketId: t.id, link,
+                type: "TICKET_ESCALATED", key: "slaEscalation", params: { clock: rule.clock.toLowerCase(), clockTh: thClock(rule.clock === "RESPONSE" ? "response" : "resolution"), pct: rule.atPercent, number: t.number, subject: t.subject }, title: `${reason} — ${t.number}`, body: t.subject, ticketId: t.id, link,
               });
             }
             if (rule.escalateToTeamId && rule.escalateToTeamId !== current.ownerTeamId) {
@@ -150,7 +151,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
                   prevAgentId: current.assignedAgentId, newAgentId: null, changedById: null, reason } });
                 await tx.ticketHistory.create({ data: { ticketId: t.id, actorId: null, action: "ESCALATED", field: "escalation", newValue: `→ ${team.name}`, reason } });
                 await notifyUsers(tx, await teamMemberIds(tx, team.id, true), {
-                  type: "TICKET_ESCALATED", title: `Escalated to ${team.name}: ${t.number}`, body: reason, ticketId: t.id, link,
+                  type: "TICKET_ESCALATED", key: "escalatedTo", params: { team: team.name, teamTh: nameTh(team), number: t.number, reason }, title: `Escalated to ${team.name}: ${t.number}`, body: reason, ticketId: t.id, link,
                 });
               }
             }
@@ -176,7 +177,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
           await tx.taskHistory.create({ data: { taskId: task.id, actorId: null, action: "OVERDUE", newValue: "Task is overdue" } });
           const to = [...(task.assignedAgentId ? [task.assignedAgentId] : await teamMemberIds(tx, task.teamId)), ...(await teamMemberIds(tx, task.teamId, true))];
           await notifyUsers(tx, to, {
-            type: "TASK_OVERDUE", title: `Task overdue: ${task.number}`, body: task.title, ticketId: task.ticketId,
+            type: "TASK_OVERDUE", key: "taskOverdue", params: { task: task.number, title: task.title }, title: `Task overdue: ${task.number}`, body: task.title, ticketId: task.ticketId,
             link: `/admin/tickets/${task.ticket.number}?task=${task.number}`,
           });
         });
@@ -191,7 +192,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
       const cutoff = new Date(now.getTime() - days * 86_400_000);
       const resolved = await db.ticket.findMany({
         where: { deletedAt: null, status: { kind: "RESOLVED" }, resolvedAt: { lt: cutoff } },
-        select: { id: true, number: true, subject: true, statusId: true, requesterId: true, status: { select: { name: true } } },
+        select: { id: true, number: true, subject: true, statusId: true, requesterId: true, status: { select: { name: true, nameTh: true } } },
         take: batch,
       });
       for (const t of resolved) {
@@ -206,7 +207,7 @@ export async function runSlaSweep(opts: { now?: Date; db?: PrismaClient; batch?:
             const reason = `Auto-closed after ${days} day(s) in ${t.status.name}`;
             await tx.ticketHistory.create({ data: { ticketId: t.id, actorId: null, action: "STATUS_CHANGED", field: "status", oldValue: t.status.name, newValue: tr.toStatus.name, reason } });
             await audit(tx, null, { action: "STATUS_CHANGED", entityType: "Ticket", entityId: t.id, ticketId: t.id, oldValue: { status: t.status.name }, newValue: { status: tr.toStatus.name, reason } });
-            await notifyUsers(tx, [t.requesterId], { type: "TICKET_CLOSED", title: `${t.number} was closed automatically`, body: reason, ticketId: t.id, link: `/tickets/${t.number}` });
+            await notifyUsers(tx, [t.requesterId], { type: "TICKET_CLOSED", key: "autoClosed", params: { number: t.number, days, status: t.status.name, statusTh: nameTh(t.status) }, title: `${t.number} was closed automatically`, body: reason, ticketId: t.id, link: `/tickets/${t.number}` });
           });
           r.autoClosed++;
         });

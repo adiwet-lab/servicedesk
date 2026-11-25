@@ -6,6 +6,7 @@ import {
   createArticle, createArticleFromTicket, giveFeedback, setArticleStatus, suggestArticles, updateArticle,
 } from "@/server/services/kb";
 import { ValidationError } from "@/server/authz/errors";
+import { currentLocale } from "@/i18n/server";
 import { runAction, formToObject, type ActionResult } from "./result";
 
 export async function createArticleAction(_p: ActionResult<{ number: string }> | null, fd: FormData): Promise<ActionResult<{ number: string }>> {
@@ -42,7 +43,7 @@ export async function setArticleStatusAction(fd: FormData) {
 export async function createArticleFromTicketAction(_p: ActionResult<{ number: string }> | null, fd: FormData): Promise<ActionResult<{ number: string }>> {
   const r = await runAction(async () => {
     const actor = await requireActorOrThrow();
-    const a = await createArticleFromTicket(actor, String(fd.get("ticketId") ?? ""));
+    const a = await createArticleFromTicket(actor, String(fd.get("ticketId") ?? ""), await currentLocale());
     return { number: a.number };
   });
   if (r.ok && r.data) redirect(`/admin/kb/${r.data.number}?fromTicket=1`);
@@ -69,6 +70,6 @@ export async function deflectAction(articleId: string, number: string) {
 export async function suggestArticlesAction(text: string, categoryId?: string) {
   const actor = await requireActorOrThrow();
   if (typeof text !== "string" || text.length > 400) return [];
-  const rows = await suggestArticles(actor, text, typeof categoryId === "string" ? categoryId : undefined);
+  const rows = await suggestArticles(actor, text, typeof categoryId === "string" ? categoryId : undefined, await currentLocale());
   return rows.map((r) => ({ id: r.id, number: r.number, title: r.title, snippet: r.snippet, type: r.type }));
 }

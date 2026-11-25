@@ -1,3 +1,6 @@
+import { nameTh } from "@/i18n/server-text";
+import { ln } from "@/lib/localized";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { z } from "zod";
 import { prisma } from "@/server/db";
 import { transaction } from "@/server/db-tx";
@@ -94,10 +97,10 @@ export async function updateTicketFields(actor: Actor, ticketId: string, raw: un
   // Names for readable history
   const ids = [ticket.categoryId, ticket.subcategoryId, category.id, subcategory?.id].filter(Boolean) as string[];
   const [cats, prios, branches, locations] = await Promise.all([
-    prisma.category.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
-    prisma.priority.findMany({ where: { id: { in: [ticket.priorityId, priority.id] } }, select: { id: true, code: true, name: true } }),
-    prisma.branch.findMany({ where: { id: { in: [ticket.branchId, input.branchId].filter(Boolean) as string[] } }, select: { id: true, name: true } }),
-    prisma.location.findMany({ where: { id: { in: [ticket.locationId, input.locationId].filter(Boolean) as string[] } }, select: { id: true, name: true } }),
+    prisma.category.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, nameTh: true } }),
+    prisma.priority.findMany({ where: { id: { in: [ticket.priorityId, priority.id] } }, select: { id: true, code: true, name: true, nameTh: true } }),
+    prisma.branch.findMany({ where: { id: { in: [ticket.branchId, input.branchId].filter(Boolean) as string[] } }, select: { id: true, name: true, nameTh: true } }),
+    prisma.location.findMany({ where: { id: { in: [ticket.locationId, input.locationId].filter(Boolean) as string[] } }, select: { id: true, name: true, nameTh: true } }),
   ]);
   const nm = (list: { id: string; name: string }[], id: string | null) => (id ? list.find((x) => x.id === id)?.name ?? id : null);
   const pn = (id: string) => { const p = prios.find((x) => x.id === id); return p ? `${p.code} ${p.name}` : id; };
@@ -163,7 +166,7 @@ export async function updateTicketFields(actor: Actor, ticketId: string, raw: un
         newValue: Object.fromEntries(rest.map((c) => [c.field, c.field === "description" ? "…" : c.neu])) });
     }
     await notifyUsers(tx, [ticket.requesterId, ticket.assignedAgentId], {
-      type: "TICKET_UPDATED", title: `${ticket.number} updated`, body: changes.map((c) => c.label).join(", "),
+      type: "TICKET_UPDATED", key: "ticketUpdated", params: { number: ticket.number, fields: changes.map((c) => c.label).join(", ") }, title: `${ticket.number} updated`, body: changes.map((c) => c.label).join(", "),
       ticketId: ticket.id, link: `/tickets/${ticket.number}`,
     }, actor);
   });
@@ -186,7 +189,7 @@ export async function addSupportingTeam(actor: Actor, ticketId: string, teamId: 
     await tx.ticketHistory.create({ data: { ticketId, actorId: actor.id, action: "SUPPORTING_TEAM_ADDED", newValue: team.name } });
     await audit(tx, actor, { action: "SUPPORTING_TEAM_ADDED", entityType: "Ticket", entityId: ticketId, ticketId, newValue: { teamId, team: team.name } });
     await notifyUsers(tx, await teamMemberIds(tx, teamId), {
-      type: "TICKET_ASSIGNED", title: `${team.name} added as supporting team on ${ticket.number}`, body: ticket.subject,
+      type: "TICKET_ASSIGNED", key: "supportingAdded", params: { team: team.name, teamTh: nameTh(team), number: ticket.number, subject: ticket.subject }, title: `${team.name} added as supporting team on ${ticket.number}`, body: ticket.subject,
       ticketId, link: `/admin/tickets/${ticket.number}`,
     }, actor);
   });
@@ -273,22 +276,29 @@ export async function escalateTicket(actor: Actor, ticketId: string, raw: unknow
     });
     const leads = await teamMemberIds(tx, teamId, true);
     await notifyUsers(tx, [...leads, ticket.assignedAgentId], {
-      type: "TICKET_ESCALATED", title: `Escalated: ${ticket.number}`, body: input.reason, ticketId: ticket.id, link: `/admin/tickets/${ticket.number}`,
+      type: "TICKET_ESCALATED", key: "escalated", params: { number: ticket.number, reason: input.reason ?? "" }, title: `Escalated: ${ticket.number}`, body: input.reason, ticketId: ticket.id, link: `/admin/tickets/${ticket.number}`,
     }, actor);
   });
 }
 
 /** Options for the edit dialog. */
-export async function getTicketEditOptions() {
+export async function getTicketEditOptions(locale: Locale = DEFAULT_LOCALE) {
   const [categories, priorities, branches, teams] = await Promise.all([
     prisma.category.findMany({
       where: { parentId: null, isActive: true, deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, children: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
+      select: { id: true, name: true, nameTh: true, children: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true, nameTh: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
     }),
-    prisma.priority.findMany({ where: { isActive: true }, orderBy: { level: "asc" }, select: { id: true, code: true, name: true, level: true } }),
+    prisma.priority.findMany({ where: { isActive: true }, orderBy: { level: "asc" }, select: { id: true, code: true, name: true, nameTh: true, level: true } }),
     prisma.branch.findMany({ where: { isActive: true, deletedAt: null }, orderBy: { name: "asc" },
-      select: { id: true, name: true, locations: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true } } } }),
-    prisma.supportTeam.findMany({ where: { isActive: true, deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true } }),
+      select: { id: true, name: true, nameTh: true, locations: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true, nameTh: true } } } }),
+    prisma.supportTeam.findMany({ where: { isActive: true, deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, nameTh: true, type: true } }),
   ]);
-  return { categories, priorities, branches, teams };
+  // Names localized for the client dialogs.
+  const L = <T extends { name: string; nameTh: string | null }>(r: T) => ({ ...r, name: ln(r, locale) });
+  return {
+    categories: categories.map((c) => ({ ...L(c), children: c.children.map(L) })),
+    priorities: priorities.map(L),
+    branches: branches.map((b) => ({ ...L(b), locations: b.locations.map(L) })),
+    teams: teams.map(L),
+  };
 }

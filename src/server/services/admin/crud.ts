@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { messagesFor } from "@/i18n/messages";
+import type { Locale } from "@/i18n/config";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import type { Actor } from "@/server/authz/actor";
@@ -112,21 +114,22 @@ const ENTITIES = {
         { name: "companyId", label: "Company", type: "select", required: true, options: await opt.companies(), immutable: true },
         { name: "code", label: "Code", type: "text", required: true, immutable: true, max: 20, pattern: CODE },
         { name: "name", label: "Name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
       ];
     },
-    columns: [{ key: "company", label: "Company" }, { key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "users", label: "Employees" }],
+    columns: [{ key: "company", label: "Company" }, { key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "nameTh", label: "Name (TH)" }, { key: "users", label: "Employees" }],
     async list() {
       const rows = await prisma.department.findMany({ where: { deletedAt: null }, include: { company: true, _count: { select: { users: true } } }, orderBy: [{ company: { name: "asc" } }, { name: "asc" }] });
-      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { companyId: r.companyId, code: r.code, name: r.name },
-        cells: { company: r.company.name, code: r.code, name: r.name, users: r._count.users } }));
+      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { companyId: r.companyId, code: r.code, name: r.name, nameTh: r.nameTh },
+        cells: { company: r.company.name, code: r.code, name: r.name, nameTh: r.nameTh ?? "—", users: r._count.users } }));
     },
     async save(tx, id, v) {
       if (id) {
         const before = await tx.department.findUniqueOrThrow({ where: { id } });
-        await tx.department.update({ where: { id }, data: { name: String(v.name) } });
-        return { id, before, after: { name: v.name } };
+        await tx.department.update({ where: { id }, data: { name: String(v.name), nameTh: s(v.nameTh) } });
+        return { id, before, after: { name: v.name, nameTh: s(v.nameTh) } };
       }
-      const r = await tx.department.create({ data: { companyId: String(v.companyId), code: String(v.code).toUpperCase(), name: String(v.name) } });
+      const r = await tx.department.create({ data: { companyId: String(v.companyId), code: String(v.code).toUpperCase(), name: String(v.name), nameTh: s(v.nameTh) } });
       return { id: r.id, before: null, after: r };
     },
     async setActive(tx, id, active) { await tx.department.update({ where: { id }, data: { isActive: active } }); },
@@ -139,17 +142,18 @@ const ENTITIES = {
         { name: "companyId", label: "Company", type: "select", required: true, options: await opt.companies(), immutable: true },
         { name: "code", label: "Code", type: "text", required: true, immutable: true, max: 20, pattern: CODE },
         { name: "name", label: "Name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
         { name: "address", label: "Address", type: "textarea" },
       ];
     },
-    columns: [{ key: "company", label: "Company" }, { key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "locations", label: "Locations" }],
+    columns: [{ key: "company", label: "Company" }, { key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "nameTh", label: "Name (TH)" }, { key: "locations", label: "Locations" }],
     async list() {
       const rows = await prisma.branch.findMany({ where: { deletedAt: null }, include: { company: true, _count: { select: { locations: true } } }, orderBy: [{ company: { name: "asc" } }, { name: "asc" }] });
-      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { companyId: r.companyId, code: r.code, name: r.name, address: r.address },
-        cells: { company: r.company.name, code: r.code, name: r.name, locations: r._count.locations } }));
+      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { companyId: r.companyId, code: r.code, name: r.name, nameTh: r.nameTh, address: r.address },
+        cells: { company: r.company.name, code: r.code, name: r.name, nameTh: r.nameTh ?? "—", locations: r._count.locations } }));
     },
     async save(tx, id, v) {
-      const data = { name: String(v.name), address: s(v.address) };
+      const data = { name: String(v.name), nameTh: s(v.nameTh), address: s(v.address) };
       if (id) {
         const before = await tx.branch.findUniqueOrThrow({ where: { id } });
         await tx.branch.update({ where: { id }, data });
@@ -168,21 +172,22 @@ const ENTITIES = {
         { name: "branchId", label: "Branch", type: "select", required: true, options: await opt.branches(), immutable: true },
         { name: "code", label: "Code", type: "text", required: true, immutable: true, max: 20, pattern: CODE },
         { name: "name", label: "Name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
       ];
     },
-    columns: [{ key: "branch", label: "Branch" }, { key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }],
+    columns: [{ key: "branch", label: "Branch" }, { key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "nameTh", label: "Name (TH)" }],
     async list() {
       const rows = await prisma.location.findMany({ where: { deletedAt: null }, include: { branch: true }, orderBy: [{ branch: { name: "asc" } }, { name: "asc" }] });
-      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { branchId: r.branchId, code: r.code, name: r.name },
-        cells: { branch: r.branch.name, code: r.code, name: r.name } }));
+      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { branchId: r.branchId, code: r.code, name: r.name, nameTh: r.nameTh },
+        cells: { branch: r.branch.name, code: r.code, name: r.name, nameTh: r.nameTh ?? "—" } }));
     },
     async save(tx, id, v) {
       if (id) {
         const before = await tx.location.findUniqueOrThrow({ where: { id } });
-        await tx.location.update({ where: { id }, data: { name: String(v.name) } });
-        return { id, before, after: { name: v.name } };
+        await tx.location.update({ where: { id }, data: { name: String(v.name), nameTh: s(v.nameTh) } });
+        return { id, before, after: { name: v.name, nameTh: s(v.nameTh) } };
       }
-      const r = await tx.location.create({ data: { branchId: String(v.branchId), code: String(v.code).toUpperCase(), name: String(v.name) } });
+      const r = await tx.location.create({ data: { branchId: String(v.branchId), code: String(v.code).toUpperCase(), name: String(v.name), nameTh: s(v.nameTh) } });
       return { id: r.id, before: null, after: r };
     },
     async setActive(tx, id, active) { await tx.location.update({ where: { id }, data: { isActive: active } }); },
@@ -195,18 +200,19 @@ const ENTITIES = {
       return [
         { name: "code", label: "Code", type: "text", required: true, immutable: true, max: 10, pattern: CODE },
         { name: "name", label: "Name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
         { name: "level", label: "Level (1 = highest)", type: "number", required: true },
         { name: "color", label: "Colour", type: "color", required: true },
       ];
     },
-    columns: [{ key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "level", label: "Level" }, { key: "color", label: "Colour", kind: "color" }],
+    columns: [{ key: "code", label: "Code", kind: "mono" }, { key: "name", label: "Name" }, { key: "nameTh", label: "Name (TH)" }, { key: "level", label: "Level" }, { key: "color", label: "Colour", kind: "color" }],
     async list() {
       const rows = await prisma.priority.findMany({ orderBy: { level: "asc" } });
-      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { code: r.code, name: r.name, level: r.level, color: r.color },
-        cells: { code: r.code, name: r.name, level: r.level, color: r.color } }));
+      return rows.map((r) => ({ id: r.id, isActive: r.isActive, values: { code: r.code, name: r.name, nameTh: r.nameTh, level: r.level, color: r.color },
+        cells: { code: r.code, name: r.name, nameTh: r.nameTh ?? "—", level: r.level, color: r.color } }));
     },
     async save(tx, id, v) {
-      const data = { name: String(v.name), level: Number(v.level), color: String(v.color) };
+      const data = { name: String(v.name), nameTh: s(v.nameTh), level: Number(v.level), color: String(v.color) };
       if (id) {
         const before = await tx.priority.findUniqueOrThrow({ where: { id } });
         await tx.priority.update({ where: { id }, data });
@@ -226,6 +232,7 @@ const ENTITIES = {
         { name: "parentId", label: "Parent (main category)", type: "select", options: await opt.mainCategories(), immutable: true, hint: "Empty = main category" },
         { name: "code", label: "Code", type: "text", required: true, immutable: true, max: 30, pattern: CODE },
         { name: "name", label: "Name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
         { name: "description", label: "Description", type: "textarea" },
         { name: "defaultTeamId", label: "Default support team", type: "select", options: await opt.teams() },
         { name: "defaultPriorityId", label: "Default priority", type: "select", options: await opt.priorities() },
@@ -235,7 +242,7 @@ const ENTITIES = {
         { name: "sortOrder", label: "Sort order", type: "number" },
       ];
     },
-    columns: [{ key: "path", label: "Category" }, { key: "code", label: "Code", kind: "mono" }, { key: "team", label: "Default team" }, { key: "priority", label: "Default priority" }, { key: "required", label: "Required fields" }],
+    columns: [{ key: "path", label: "Category" }, { key: "nameTh", label: "Name (TH)" }, { key: "code", label: "Code", kind: "mono" }, { key: "team", label: "Default team" }, { key: "priority", label: "Default priority" }, { key: "required", label: "Required fields" }],
     async list() {
       const rows = await prisma.category.findMany({
         where: { deletedAt: null },
@@ -246,15 +253,15 @@ const ENTITIES = {
       rows.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
       return rows.map((r) => ({
         id: r.id, isActive: r.isActive,
-        values: { parentId: r.parentId, code: r.code, name: r.name, description: r.description, defaultTeamId: r.defaultTeamId,
+        values: { parentId: r.parentId, code: r.code, name: r.name, nameTh: r.nameTh, description: r.description, defaultTeamId: r.defaultTeamId,
           defaultPriorityId: r.defaultPriorityId, slaProfileId: r.slaProfileId, requiredFields: r.requiredFields, sortOrder: r.sortOrder },
-        cells: { path: r.parent ? `↳ ${r.name}` : r.name, code: r.code, team: r.defaultTeam?.name ?? (r.parent ? "(inherit)" : "—"),
+        cells: { path: r.parent ? `↳ ${r.name}` : r.name, nameTh: r.nameTh ?? "—", code: r.code, team: r.defaultTeam?.name ?? (r.parent ? "(inherit)" : "—"),
           priority: r.defaultPriority?.code ?? "—", required: ((r.requiredFields as string[]) ?? []).join(", ") || "—" },
       }));
     },
     async save(tx, id, v) {
       const data = {
-        name: String(v.name), description: s(v.description), defaultTeamId: s(v.defaultTeamId), defaultPriorityId: s(v.defaultPriorityId),
+        name: String(v.name), nameTh: s(v.nameTh), description: s(v.description), defaultTeamId: s(v.defaultTeamId), defaultPriorityId: s(v.defaultPriorityId),
         slaProfileId: s(v.slaProfileId), requiredFields: (v.requiredFields as string[]) ?? [], sortOrder: Number(v.sortOrder ?? 0),
       };
       if (id) {
@@ -331,6 +338,7 @@ const ENTITIES = {
       return [
         { name: "code", label: "Code", type: "text", required: true, immutable: true, max: 30, pattern: CODE },
         { name: "name", label: "Name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
         { name: "kind", label: "Kind", type: "select", required: true, immutable: true,
           options: ["NEW", "OPEN", "WAITING", "RESOLVED", "CLOSED", "CANCELLED"].map((k) => ({ value: k, label: k })) },
         { name: "color", label: "Colour", type: "color", required: true },
@@ -340,15 +348,15 @@ const ENTITIES = {
         { name: "isDefault", label: "Initial status for new tickets", type: "checkbox" },
       ];
     },
-    columns: [{ key: "name", label: "Name" }, { key: "code", label: "Code", kind: "mono" }, { key: "kind", label: "Kind", kind: "badge" }, { key: "color", label: "Colour", kind: "color" }, { key: "requiresReason", label: "Reason", kind: "bool" }, { key: "pausesSla", label: "Pauses SLA", kind: "bool" }, { key: "isDefault", label: "Initial", kind: "bool" }],
+    columns: [{ key: "name", label: "Name" }, { key: "nameTh", label: "Name (TH)" }, { key: "code", label: "Code", kind: "mono" }, { key: "kind", label: "Kind", kind: "badge" }, { key: "color", label: "Colour", kind: "color" }, { key: "requiresReason", label: "Reason", kind: "bool" }, { key: "pausesSla", label: "Pauses SLA", kind: "bool" }, { key: "isDefault", label: "Initial", kind: "bool" }],
     async list() {
       const rows = await prisma.ticketStatus.findMany({ orderBy: { order: "asc" } });
       return rows.map((r) => ({ id: r.id, isActive: r.isActive,
-        values: { code: r.code, name: r.name, kind: r.kind, color: r.color, order: r.order, requiresReason: r.requiresReason, pausesSla: r.pausesSla, isDefault: r.isDefault },
-        cells: { name: r.name, code: r.code, kind: r.kind, color: r.color, requiresReason: r.requiresReason, pausesSla: r.pausesSla, isDefault: r.isDefault } }));
+        values: { code: r.code, name: r.name, nameTh: r.nameTh, kind: r.kind, color: r.color, order: r.order, requiresReason: r.requiresReason, pausesSla: r.pausesSla, isDefault: r.isDefault },
+        cells: { name: r.name, nameTh: r.nameTh ?? "—", code: r.code, kind: r.kind, color: r.color, requiresReason: r.requiresReason, pausesSla: r.pausesSla, isDefault: r.isDefault } }));
     },
     async save(tx, id, v) {
-      const data = { name: String(v.name), color: String(v.color), order: Number(v.order ?? 0), requiresReason: !!v.requiresReason, pausesSla: !!v.pausesSla, isDefault: !!v.isDefault };
+      const data = { name: String(v.name), nameTh: s(v.nameTh), color: String(v.color), order: Number(v.order ?? 0), requiresReason: !!v.requiresReason, pausesSla: !!v.pausesSla, isDefault: !!v.isDefault };
       if (data.isDefault) await tx.ticketStatus.updateMany({ where: { isDefault: true, ...(id ? { NOT: { id } } : {}) }, data: { isDefault: false } });
       if (id) {
         const before = await tx.ticketStatus.findUniqueOrThrow({ where: { id } });
@@ -375,6 +383,7 @@ const ENTITIES = {
       return [
         { name: "code", label: "Team code", type: "text", required: true, immutable: true, max: 30, pattern: CODE },
         { name: "name", label: "Team name", type: "text", required: true },
+        { name: "nameTh", label: "Name (TH)", type: "text", hint: "Thai display name. Leave empty to show the English name." },
         { name: "description", label: "Description", type: "textarea" },
         { name: "type", label: "Team type", type: "select", required: true, options: [{ value: "INTERNAL", label: "Internal" }, { value: "VENDOR", label: "External Vendor" }, { value: "OUTSOURCE", label: "Outsource" }] },
         { name: "companyId", label: "Company", type: "select", options: await opt.companies() },
@@ -382,15 +391,15 @@ const ENTITIES = {
         { name: "slaProfileId", label: "SLA profile", type: "select", options: await opt.slaProfiles() },
       ];
     },
-    columns: [{ key: "name", label: "Team" }, { key: "code", label: "Code", kind: "mono" }, { key: "type", label: "Type", kind: "badge" }, { key: "tenant", label: "Tenant" }, { key: "lead", label: "Team lead" }, { key: "members", label: "Members" }],
+    columns: [{ key: "name", label: "Team" }, { key: "nameTh", label: "Name (TH)" }, { key: "code", label: "Code", kind: "mono" }, { key: "type", label: "Type", kind: "badge" }, { key: "tenant", label: "Tenant" }, { key: "lead", label: "Team lead" }, { key: "members", label: "Members" }],
     async list() {
       const rows = await prisma.supportTeam.findMany({ where: { deletedAt: null }, include: { tenant: true, lead: true, _count: { select: { members: true } } }, orderBy: { name: "asc" } });
       return rows.map((r) => ({ id: r.id, isActive: r.isActive,
-        values: { code: r.code, name: r.name, description: r.description, type: r.type, companyId: r.companyId, tenantId: r.tenantId, slaProfileId: r.slaProfileId },
-        cells: { name: r.name, code: r.code, type: r.type, tenant: r.tenant?.name ?? "—", lead: r.lead?.displayName ?? "—", members: r._count.members } }));
+        values: { code: r.code, name: r.name, nameTh: r.nameTh, description: r.description, type: r.type, companyId: r.companyId, tenantId: r.tenantId, slaProfileId: r.slaProfileId },
+        cells: { name: r.name, nameTh: r.nameTh ?? "—", code: r.code, type: r.type, tenant: r.tenant?.name ?? "—", lead: r.lead?.displayName ?? "—", members: r._count.members } }));
     },
     async save(tx, id, v) {
-      const data = { name: String(v.name), description: s(v.description), type: String(v.type) as never, companyId: s(v.companyId), tenantId: s(v.tenantId), slaProfileId: s(v.slaProfileId) };
+      const data = { name: String(v.name), nameTh: s(v.nameTh), description: s(v.description), type: String(v.type) as never, companyId: s(v.companyId), tenantId: s(v.tenantId), slaProfileId: s(v.slaProfileId) };
       if (id) {
         const before = await tx.supportTeam.findUniqueOrThrow({ where: { id } });
         await tx.supportTeam.update({ where: { id }, data });
@@ -565,44 +574,70 @@ function getEntity(key: string): EntityDef {
   return e;
 }
 
-export async function loadCrudPage(actor: Actor, key: EntityKey) {
-  const e = getEntity(key);
-  requirePermission(actor, e.permission);
-  const [fields, rows] = await Promise.all([e.fields(), e.list()]);
-  return { key, title: e.title, singular: e.singular, description: e.description ?? null, fields, columns: e.columns, rows, canToggle: !!e.setActive };
+/**
+ * UI text of the entity definitions is written in English and translated through the `crud` catalog
+ * namespace, looked up by its English value (unknown text, e.g. record names in options, passes through).
+ */
+export function crudTranslator(locale: Locale = "en"): (text: string) => string {
+  if (locale === "en") return (x) => x;
+  const en = messagesFor("en").crud as Record<string, string>;
+  const loc = messagesFor(locale).crud as Record<string, string>;
+  const map = new Map(Object.entries(en).map(([k, v]) => [v, loc[k] ?? v]));
+  return (x) => map.get(x) ?? x;
 }
 
-function buildSchema(fields: FieldDef[], isCreate: boolean) {
+function localizeFields(fields: FieldDef[], tr: (x: string) => string): FieldDef[] {
+  return fields.map((f) => ({
+    ...f, label: tr(f.label), hint: f.hint && tr(f.hint), placeholder: f.placeholder && tr(f.placeholder),
+    pattern: f.pattern && { ...f.pattern, message: tr(f.pattern.message) },
+    options: f.options?.map((o) => ({ ...o, label: tr(o.label), group: o.group })),
+  }));
+}
+
+export async function loadCrudPage(actor: Actor, key: EntityKey, locale: Locale = "en") {
+  const e = getEntity(key);
+  requirePermission(actor, e.permission);
+  const tr = crudTranslator(locale);
+  const [fields, rows] = await Promise.all([e.fields(), e.list()]);
+  return {
+    key, title: tr(e.title), singular: tr(e.singular), description: e.description ? tr(e.description) : null,
+    fields: localizeFields(fields, tr), columns: e.columns.map((c) => ({ ...c, label: tr(c.label) })), rows, canToggle: !!e.setActive,
+  };
+}
+
+function buildSchema(fields: FieldDef[], isCreate: boolean, locale: Locale = "en") {
+  const m = messagesFor(locale).crudMsg;
+  const req = (label: string) => m.required.replace("{label}", label);
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const f of fields) {
     if (!isCreate && f.immutable) continue;
     let t: z.ZodTypeAny;
     switch (f.type) {
       case "number":
-        t = z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), f.required ? z.number({ invalid_type_error: `${f.label} is required` }).int().min(0).max(1_000_000) : z.number().int().min(0).max(1_000_000).optional());
+        t = z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), f.required ? z.number({ invalid_type_error: req(f.label) }).int().min(0).max(1_000_000) : z.number().int().min(0).max(1_000_000).optional());
         break;
       case "checkbox":
         t = z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean());
         break;
       case "multiselect": {
         const allowed = new Set((f.options ?? []).map((o) => o.value));
-        t = z.array(z.string()).default([]).refine((arr) => arr.every((x) => allowed.has(x)), "Invalid selection");
+        t = z.array(z.string()).default([]).refine((arr) => arr.every((x) => allowed.has(x)), m.invalidSelection);
         break;
       }
       case "select": {
         const allowed = new Set((f.options ?? []).map((o) => o.value));
-        const base = z.string().refine((x) => allowed.has(x), "Invalid selection");
+        const base = z.string().refine((x) => allowed.has(x), m.invalidSelection);
         t = z.preprocess((v) => (v === "" || v == null ? undefined : v), f.required ? base : base.optional());
         break;
       }
       case "color":
-        t = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a hex colour like #3366ff");
+        t = z.string().regex(/^#[0-9a-fA-F]{6}$/, m.hexColour);
         break;
       default: {
         let str = z.string().trim().max(f.max ?? (f.type === "textarea" ? 2000 : 200));
         if (f.pattern) str = str.regex(new RegExp(f.pattern.regex), f.pattern.message);
         t = f.required
-          ? z.string({ required_error: `${f.label} is required` }).trim().min(1, `${f.label} is required`).pipe(str)
+          ? z.string({ required_error: req(f.label) }).trim().min(1, req(f.label)).pipe(str)
           : z.preprocess((v) => (v === "" ? undefined : v), str.optional());
       }
     }
@@ -613,15 +648,16 @@ function buildSchema(fields: FieldDef[], isCreate: boolean) {
 
 export type CrudResult = { ok: true; id: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-export async function saveCrud(actor: Actor, key: string, id: string | null, raw: Record<string, unknown>): Promise<CrudResult> {
+export async function saveCrud(actor: Actor, key: string, id: string | null, raw: Record<string, unknown>, locale: Locale = "en"): Promise<CrudResult> {
   const e = getEntity(key);
   requirePermission(actor, e.permission);
-  const fields = await e.fields();
-  const parsed = buildSchema(fields, !id).safeParse(raw);
+  const m = messagesFor(locale).crudMsg;
+  const fields = localizeFields(await e.fields(), crudTranslator(locale));
+  const parsed = buildSchema(fields, !id, locale).safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
-    return { ok: false, error: "Please correct the highlighted fields.", fieldErrors };
+    return { ok: false, error: m.correctFields, fieldErrors };
   }
   try {
     const res = await prisma.$transaction(async (tx) => {
@@ -638,17 +674,17 @@ export async function saveCrud(actor: Actor, key: string, id: string | null, raw
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       const target = (err.meta?.target as string[] | undefined)?.join(", ") ?? "value";
-      return { ok: false, error: `A record with the same ${target} already exists.` };
+      return { ok: false, error: m.duplicate.replace("{target}", target) };
     }
     if (err instanceof ValidationError) return { ok: false, error: err.message, fieldErrors: err.fieldErrors };
     throw err;
   }
 }
 
-export async function setCrudActive(actor: Actor, key: string, id: string, active: boolean): Promise<CrudResult> {
+export async function setCrudActive(actor: Actor, key: string, id: string, active: boolean, locale: Locale = "en"): Promise<CrudResult> {
   const e = getEntity(key);
   requirePermission(actor, e.permission);
-  if (!e.setActive) return { ok: false, error: "This record cannot be deactivated." };
+  if (!e.setActive) return { ok: false, error: messagesFor(locale).crudMsg.cannotDeactivate };
   try {
     await prisma.$transaction(async (tx) => {
       await e.setActive!(tx, id, active);

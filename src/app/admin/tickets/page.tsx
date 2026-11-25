@@ -1,8 +1,9 @@
 import { requireAdminPortal } from "@/server/auth/get-actor";
 import { TICKET_VIEWS, type TicketView } from "@/server/services/tickets";
 import { TicketListPage } from "@/components/tickets/ticket-list-page";
+import { pageTitle } from "@/i18n/metadata";
 
-export const metadata = { title: "Tickets" };
+export const generateMetadata = pageTitle("tickets");
 
 const TITLES: Partial<Record<TicketView, [string, string]>> = {
   all: ["All Tickets", "Every ticket within your access scope."],

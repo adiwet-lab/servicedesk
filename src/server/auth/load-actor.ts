@@ -45,6 +45,7 @@ export async function loadActor(
     permissions: perms,
     teamIds: user.teamMemberships.map((m) => m.teamId),
     leadTeamIds: user.teamMemberships.filter((m) => m.role === "LEAD").map((m) => m.teamId),
+    locale: user.locale,
     ip: opts.ip ?? null,
     userAgent: opts.userAgent ?? null,
   };

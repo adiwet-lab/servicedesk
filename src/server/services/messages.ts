@@ -30,7 +30,7 @@ async function loadChatTicket(actor: Actor, ticketId: string) {
     where: { AND: [ticketScopeWhere(actor), { OR: [{ id: ticketId }, { number: ticketId }] }] },
     select: {
       number: true, subject: true, requesterId: true, ownerTeamId: true, assignedAgentId: true, statusId: true,
-      status: { select: { kind: true, pausesSla: true, name: true } }, ...ticketSlaSelect,
+      status: { select: { kind: true, pausesSla: true, name: true, nameTh: true } }, ...ticketSlaSelect,
     },
   });
   if (!ticket) throw new NotFoundError("Ticket not found or you do not have access.");
@@ -226,7 +226,7 @@ export async function postMessage(actor: Actor, ticketId: string, raw: unknown, 
       const excerpt = body ? body.slice(0, 140) : `📎 ${stored.map((s) => s.f.safeName).join(", ")}`;
       await notifyUsers(tx, recipients, {
         type: "NEW_MESSAGE",
-        title: `${type === "INTERNAL" ? "Internal note" : "New message"} on ${ticket.number} from ${actor.displayName}`,
+        key: type === "INTERNAL" ? "internalNote" : "newMessage", params: { number: ticket.number, name: actor.displayName, text: body.slice(0, 160) }, title: `${type === "INTERNAL" ? "Internal note" : "New message"} on ${ticket.number} from ${actor.displayName}`,
         body: excerpt, ticketId: ticket.id,
         link: isRequester || type === "INTERNAL" ? `/admin/tickets/${ticket.number}?tab=chat` : `/tickets/${ticket.number}?tab=chat`,
       }, actor);
@@ -326,7 +326,7 @@ export async function chatInbox(actor: Actor, opts: { q?: string; unreadOnly?: b
   const tickets = await prisma.ticket.findMany({
     where, take: 500, orderBy: { updatedAt: "desc" },
     select: {
-      id: true, number: true, subject: true, status: { select: { name: true, color: true } }, requester: { select: { displayName: true } },
+      id: true, number: true, subject: true, status: { select: { name: true, nameTh: true, color: true } }, requester: { select: { displayName: true } },
       messages: { where: msgScope, orderBy: { createdAt: "desc" }, take: 1, select: { body: true, type: true, createdAt: true, sender: { select: { displayName: true } }, attachments: { select: { fileName: true } } } },
     },
   });

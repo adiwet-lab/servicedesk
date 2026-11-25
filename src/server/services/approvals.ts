@@ -54,7 +54,7 @@ export async function startApprovals(
   await audit(tx, actor, { action: "APPROVAL_REQUESTED", entityType: "Ticket", entityId: ticket.id, ticketId: ticket.id,
     newValue: { policy: plan.policy.name, steps: plan.steps.map((s) => ({ order: s.order, approverId: s.approverId, viaFallback: s.viaFallback })) } });
   await notifyUsers(tx, [plan.steps[0]!.approverId], {
-    type: "APPROVAL_REQUESTED", title: `Approval needed: ${ticket.number}`, body: `${ticket.subject} — ${plan.steps[0]!.name}`, ticketId: ticket.id, link: "/approvals",
+    type: "APPROVAL_REQUESTED", key: "approvalNeeded", params: { number: ticket.number, subject: ticket.subject, step: plan.steps[0]!.name, stepTh: plan.steps[0]!.name }, title: `Approval needed: ${ticket.number}`, body: `${ticket.subject} — ${plan.steps[0]!.name}`, ticketId: ticket.id, link: "/approvals",
   }, actor);
 }
 
@@ -87,7 +87,7 @@ export async function decideApproval(actor: Actor, approvalId: string, raw: unkn
     const t = await tx.ticket.findUniqueOrThrow({
       where: { id: row.ticketId },
       select: { ...ticketSlaSelect, number: true, subject: true, requesterId: true, ownerTeamId: true, assignedAgentId: true, statusId: true,
-        status: { select: { code: true, kind: true, pausesSla: true, name: true } }, approvals: { select: { stepOrder: true, decision: true, approverId: true, stepName: true } } },
+        status: { select: { code: true, kind: true, pausesSla: true, name: true, nameTh: true } }, approvals: { select: { stepOrder: true, decision: true, approverId: true, stepName: true } } },
     });
     await tx.ticketHistory.create({ data: { ticketId: t.id, actorId: actor.id, action: decision === "APPROVED" ? "APPROVAL_APPROVED" : "APPROVAL_REJECTED", field: row.stepName, newValue: decision === "APPROVED" ? "Approved" : "Rejected", reason: comment ?? null } });
     await audit(tx, actor, { action: `APPROVAL_${decision}`, entityType: "Ticket", entityId: t.id, ticketId: t.id, newValue: { step: row.stepOrder, comment: comment ?? null } });
@@ -102,7 +102,7 @@ export async function decideApproval(actor: Actor, approvalId: string, raw: unkn
         await tx.ticketHistory.create({ data: { ticketId: t.id, actorId: actor.id, action: "STATUS_CHANGED", field: "status", oldValue: t.status.name, newValue: tr.toStatus.name, reason: `Approval rejected: ${comment}` } });
       }
       await tx.ticket.update({ where: { id: t.id }, data });
-      await notifyUsers(tx, [t.requesterId, ...staff], { type: "APPROVAL_DECIDED", title: `${t.number} was not approved`, body: `${row.stepName}: ${comment}`, ticketId: t.id, link: `/tickets/${t.number}` }, actor);
+      await notifyUsers(tx, [t.requesterId, ...staff], { type: "APPROVAL_DECIDED", key: "notApproved", params: { number: t.number, step: row.stepName, stepTh: row.stepName, comment: comment ?? "" }, title: `${t.number} was not approved`, body: `${row.stepName}: ${comment}`, ticketId: t.id, link: `/tickets/${t.number}` }, actor);
       return { status: "REJECTED" as const };
     }
 
@@ -110,12 +110,12 @@ export async function decideApproval(actor: Actor, approvalId: string, raw: unkn
     if (!next.done) {
       const n = t.approvals.find((a) => a.stepOrder === next.nextOrder)!;
       await tx.ticketApproval.update({ where: { ticketId_stepOrder: { ticketId: t.id, stepOrder: n.stepOrder } }, data: { decision: "PENDING" } });
-      await notifyUsers(tx, [n.approverId], { type: "APPROVAL_REQUESTED", title: `Approval needed: ${t.number}`, body: `${t.subject} — ${n.stepName}`, ticketId: t.id, link: "/approvals" }, actor);
+      await notifyUsers(tx, [n.approverId], { type: "APPROVAL_REQUESTED", key: "approvalNeeded", params: { number: t.number, subject: t.subject, step: n.stepName, stepTh: n.stepName }, title: `Approval needed: ${t.number}`, body: `${t.subject} — ${n.stepName}`, ticketId: t.id, link: "/approvals" }, actor);
       return { status: "PENDING" as const };
     }
     const sla = await resumeAfterApproval(tx, t, t.status, now);
     await tx.ticket.update({ where: { id: t.id }, data: { approvalStatus: "APPROVED", ...sla } });
-    await notifyUsers(tx, [t.requesterId, ...staff], { type: "APPROVAL_DECIDED", title: `${t.number} approved`, body: t.subject, ticketId: t.id, link: `/tickets/${t.number}` }, actor);
+    await notifyUsers(tx, [t.requesterId, ...staff], { type: "APPROVAL_DECIDED", key: "approved", params: { number: t.number, subject: t.subject }, title: `${t.number} approved`, body: t.subject, ticketId: t.id, link: `/tickets/${t.number}` }, actor);
     return { status: "APPROVED" as const };
   });
 }
@@ -126,8 +126,8 @@ export async function myApprovals(actor: Actor) {
   const select = {
     id: true, stepName: true, stepOrder: true, decision: true, comment: true, decidedAt: true, createdAt: true,
     ticket: { select: { id: true, number: true, subject: true, description: true, createdAt: true, approvalStatus: true,
-      requester: { select: { displayName: true, jobTitle: true, department: { select: { name: true } } } },
-      category: { select: { name: true } }, subcategory: { select: { name: true } }, priority: { select: { code: true, color: true } } } },
+      requester: { select: { displayName: true, jobTitle: true, department: { select: { name: true, nameTh: true } } } },
+      category: { select: { name: true, nameTh: true } }, subcategory: { select: { name: true, nameTh: true } }, priority: { select: { code: true, color: true } } } },
   } satisfies Prisma.TicketApprovalSelect;
   const [pending, decided] = await Promise.all([
     prisma.ticketApproval.findMany({ where: { approverId: actor.id, decision: "PENDING", ticket: { deletedAt: null } }, orderBy: { createdAt: "asc" }, select }),
@@ -183,7 +183,7 @@ export async function listPolicies(actor: Actor) {
   requirePermission(actor, P.ADMIN_WORKFLOW);
   return prisma.approvalPolicy.findMany({
     orderBy: { name: "asc" },
-    include: { category: { select: { name: true, parent: { select: { name: true } } } },
+    include: { category: { select: { name: true, nameTh: true, parent: { select: { name: true, nameTh: true } } } },
       steps: { orderBy: { order: "asc" }, include: { approverUser: { select: { displayName: true } }, fallbackUser: { select: { displayName: true } } } },
       _count: { select: { tickets: true } } },
   });

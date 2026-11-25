@@ -1,7 +1,8 @@
 import { requireActor } from "@/server/auth/get-actor";
 import { TicketDetail } from "@/components/tickets/ticket-detail";
+import { pageTitle } from "@/i18n/metadata";
 
-export const metadata = { title: "Ticket" };
+export const generateMetadata = pageTitle("ticket");
 
 export default async function TicketPage({ params, searchParams }: { params: Promise<{ number: string }>; searchParams: Promise<{ created?: string; task?: string; tab?: string }> }) {
   const actor = await requireActor();

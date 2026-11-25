@@ -100,8 +100,8 @@ export async function runExpiryNotices(db: PrismaClient = prisma, now = new Date
         const claimed = await tx.user.updateMany({ where: { id: u.id, expiryNotifiedAt: u.expiryNotifiedAt }, data: { expiryNotifiedAt: now } });
         if (claimed.count !== 1) return;
         const when = u.accessExpiresAt!.toISOString().slice(0, 10);
-        await notifyUsers(tx, admins.filter((id) => id !== u.id), { type: "ACCESS_EXPIRING", title: `Access expires ${when}: ${u.displayName}`, body: `${u.tenant.name} — extend or let it lapse.`, link: `/admin/system/users/${u.id}` });
-        await notifyUsers(tx, [u.id], { type: "ACCESS_EXPIRING", title: `Your access expires on ${when}`, body: "Contact your IT administrator if you still need access." });
+        await notifyUsers(tx, admins.filter((id) => id !== u.id), { type: "ACCESS_EXPIRING", key: "accessExpiringAdmin", params: { date: when, name: u.displayName, tenant: u.tenant.name }, title: `Access expires ${when}: ${u.displayName}`, body: `${u.tenant.name} — extend or let it lapse.`, link: `/admin/system/users/${u.id}` });
+        await notifyUsers(tx, [u.id], { type: "ACCESS_EXPIRING", key: "accessExpiringSelf", params: { date: when }, title: `Your access expires on ${when}`, body: "Contact your IT administrator if you still need access." });
         await audit(tx, null, { action: "ACCESS_EXPIRY_NOTICE", entityType: "User", entityId: u.id, newValue: { accessExpiresAt: u.accessExpiresAt } });
         notified++;
       });

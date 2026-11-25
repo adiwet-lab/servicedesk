@@ -3,8 +3,9 @@ import { requireAdminPortal } from "@/server/auth/get-actor";
 import { canAny } from "@/server/authz/guards";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { ChatInbox } from "@/components/chat/chat-inbox";
+import { pageTitle } from "@/i18n/metadata";
 
-export const metadata = { title: "Support Chat" };
+export const generateMetadata = pageTitle("supportChat");
 
 export default async function SupportChatPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requireAdminPortal();

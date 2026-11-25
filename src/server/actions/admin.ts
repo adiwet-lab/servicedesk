@@ -8,10 +8,12 @@ import {
 } from "@/server/services/admin/users";
 import { saveSequence, saveSystemSettings } from "@/server/services/admin/system";
 import { runAction, formToObject, type ActionResult } from "./result";
+import { currentLocale } from "@/i18n/server";
 
 export async function saveCrudAction(entity: string, id: string | null, multi: string[], fd: FormData): Promise<CrudResult> {
   const actor = await requireActorOrThrow();
-  const res = await runAction(() => saveCrud(actor, entity, id, formToObject(fd, multi)));
+  const locale = await currentLocale();
+  const res = await runAction(() => saveCrud(actor, entity, id, formToObject(fd, multi), locale));
   revalidatePath("/admin", "layout");
   if (!res.ok) return res;
   return res.data!;
@@ -19,7 +21,8 @@ export async function saveCrudAction(entity: string, id: string | null, multi: s
 
 export async function setCrudActiveAction(entity: string, id: string, active: boolean): Promise<CrudResult> {
   const actor = await requireActorOrThrow();
-  const res = await runAction(() => setCrudActive(actor, entity, id, active));
+  const locale = await currentLocale();
+  const res = await runAction(() => setCrudActive(actor, entity, id, active, locale));
   revalidatePath("/admin", "layout");
   if (!res.ok) return res;
   return res.data!;

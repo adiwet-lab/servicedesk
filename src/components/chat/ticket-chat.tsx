@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 import { Alert, Avatar } from "@/components/ui/misc";
-import { cn, formatBytes, formatDateTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
+import { useFormat } from "@/i18n/client";
 
 export interface ChatPerms { canPostPublic: boolean; canPostInternal: boolean; canReadInternal: boolean; closed: boolean }
 
@@ -20,20 +22,22 @@ function Highlight({ text, q }: { text: string; q?: string }) {
 }
 
 function MessageBubble({ m, q }: { m: ChatMessageDto; q?: string }) {
+  const tchat = useTranslations("chat");
+  const fmt = useFormat();
   const internal = m.type === "INTERNAL";
   return (
     <li className={cn("flex gap-3", m.mine && "flex-row-reverse")} data-testid="chat-message" data-type={m.type}>
       <Avatar name={m.sender.name} />
       <div className={cn("max-w-[78%] space-y-1", m.mine && "items-end text-right")}>
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{m.sender.name}</span> · {m.sender.role} · {formatDateTime(m.createdAt)}
+          <span className="font-medium text-foreground">{m.sender.name}</span> · {m.sender.role} · {fmt.dateTime(m.createdAt)}
         </p>
         <div className={cn(
           "inline-block rounded-xl px-3.5 py-2 text-left text-sm",
           internal ? "border border-dashed border-amber-500/60 bg-amber-50 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
             : m.mine ? "bg-primary text-primary-foreground" : "bg-muted",
         )}>
-          {internal && <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"><Lock className="size-3" /> Internal note — not visible to requester</p>}
+          {internal && <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"><Lock className="size-3" /> {tchat("internalNoteNotVisibleToRequester")}</p>}
           {m.body && <p className="whitespace-pre-wrap break-words"><Highlight text={m.body} q={q} /></p>}
           {m.attachments.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -44,13 +48,13 @@ function MessageBubble({ m, q }: { m: ChatMessageDto; q?: string }) {
                 </a>
               ) : (
                 <a key={a.id} href={`/api/attachments/${a.id}`} className={cn("flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs", m.mine && !internal ? "border-white/30" : "bg-card")}>
-                  <FileText className="size-3.5" /> {a.fileName} <span className="opacity-70">{formatBytes(a.sizeBytes)}</span>
+                  <FileText className="size-3.5" /> {a.fileName} <span className="opacity-70">{fmt.bytes(a.sizeBytes)}</span>
                 </a>
               ))}
             </div>
           )}
         </div>
-        {m.mine && m.seenBy.length > 0 && <p className="text-[11px] text-muted-foreground" data-testid="seen-by">Seen by {m.seenBy.join(", ")}</p>}
+        {m.mine && m.seenBy.length > 0 && <p className="text-[11px] text-muted-foreground" data-testid="seen-by">{tchat("seenByNames", { names: m.seenBy.join(", ") })}</p>}
       </div>
     </li>
   );
@@ -60,6 +64,7 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
   ticketId: string; perms: ChatPerms; initial: { messages: ChatMessageDto[]; hasMore: boolean };
   maxFileSizeMb: number; allowedExtensions: string[];
 }) {
+  const tchat = useTranslations("chat");
   const [messages, setMessages] = useState(initial.messages);
   const [hasMore, setHasMore] = useState(initial.hasMore);
   const [searchQ, setSearchQ] = useState("");
@@ -100,7 +105,7 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
   useRealtime<{ ticketId: string }>("message:read", async (p) => {
     if (p.ticketId !== ticketId) return;
     const r = await fetchMessagesAction(ticketId);
-    if (r.ok && r.data) merge(r.data.messages); // refresh "Seen by"
+    if (r.ok && r.data) merge(r.data.messages); // refresh tchat("seenBy")
   });
 
   useEffect(() => {
@@ -158,19 +163,19 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
         <form onSubmit={runSearch} className="flex gap-2" role="search">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder="Search this conversation…" className="pl-9" aria-label="Search chat" data-testid="chat-search" />
+            <Input value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder={tchat("searchThisConversation")} className="pl-9" aria-label={tchat("searchChat")} data-testid="chat-search" />
           </div>
-          <Button type="submit" variant="secondary">Search</Button>
-          {results && <Button type="button" variant="ghost" onClick={() => { setResults(null); setSearchQ(""); }}><X /> Clear</Button>}
+          <Button type="submit" variant="secondary">{tchat("search")}</Button>
+          {results && <Button type="button" variant="ghost" onClick={() => { setResults(null); setSearchQ(""); }}><X /> {tchat("clear")}</Button>}
         </form>
-        {results && <p className="text-sm text-muted-foreground" data-testid="chat-search-count">{results.length} message(s) match “{searchQ}”.</p>}
+        {results && <p className="text-sm text-muted-foreground" data-testid="chat-search-count">{tchat("searchCount", { n: results.length, q: searchQ })}</p>}
 
         <div className="max-h-[32rem] overflow-y-auto rounded-lg border bg-background/50 p-4" data-testid="chat-log">
           {!results && hasMore && (
-            <div className="mb-3 text-center"><Button variant="ghost" size="sm" onClick={loadEarlier}>Load earlier messages</Button></div>
+            <div className="mb-3 text-center"><Button variant="ghost" size="sm" onClick={loadEarlier}>{tchat("loadEarlierMessages")}</Button></div>
           )}
           {shown.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{results ? "No matching messages." : "No messages yet. Start the conversation below."}</p>
+            <p className="py-10 text-center text-sm text-muted-foreground">{results ? tchat("noMatchingMessages") : tchat("noMessagesYetStartTheConversation")}</p>
           ) : (
             <ul className="space-y-4">{shown.map((m) => <MessageBubble key={m.id} m={m} q={results ? searchQ : undefined} />)}</ul>
           )}
@@ -182,32 +187,32 @@ export function TicketChat({ ticketId, perms, initial, maxFileSizeMb, allowedExt
             <input type="hidden" name="ticketId" value={ticketId} />
             {error && <Alert variant="destructive">{error}</Alert>}
             {perms.canPostInternal && (
-              <div className="flex gap-1" role="radiogroup" aria-label="Message type">
+              <div className="flex gap-1" role="radiogroup" aria-label={tchat("messageType")}>
                 {perms.canPostPublic && (
                   <button type="button" role="radio" aria-checked={type === "PUBLIC"} onClick={() => setType("PUBLIC")}
-                    className={cn("rounded-md px-3 py-1 text-xs font-medium", type === "PUBLIC" ? "bg-primary text-primary-foreground" : "hover:bg-accent")} data-testid="chat-type-public">Public reply</button>
+                    className={cn("rounded-md px-3 py-1 text-xs font-medium", type === "PUBLIC" ? "bg-primary text-primary-foreground" : "hover:bg-accent")} data-testid="chat-type-public">{tchat("publicReply")}</button>
                 )}
                 <button type="button" role="radio" aria-checked={type === "INTERNAL"} onClick={() => setType("INTERNAL")}
-                  className={cn("flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium", type === "INTERNAL" ? "bg-amber-500 text-white" : "hover:bg-accent")} data-testid="chat-type-internal"><Lock className="size-3" /> Internal note</button>
+                  className={cn("flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium", type === "INTERNAL" ? "bg-amber-500 text-white" : "hover:bg-accent")} data-testid="chat-type-internal"><Lock className="size-3" /> {tchat("internalNote")}</button>
               </div>
             )}
-            <Textarea name="body" rows={3} maxLength={10000} placeholder={type === "INTERNAL" ? "Internal note — visible to support staff only…" : "Write a message… (Ctrl+Enter to send)"}
-              aria-label="Message" data-testid="chat-input"
+            <Textarea name="body" rows={3} maxLength={10000} placeholder={type === "INTERNAL" ? tchat("internalNoteVisibleToSupportStaff") : tchat("writeAMessageCtrlEnterTo")}
+              aria-label={tchat("message")} data-testid="chat-input"
               onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); formRef.current?.requestSubmit(); } }} />
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs hover:bg-accent">
-                <Paperclip className="size-3.5" /> Attach
+                <Paperclip className="size-3.5" /> {tchat("attach")}
                 <input type="file" name="attachments" multiple className="sr-only" accept={allowedExtensions.map((e) => `.${e}`).join(",")}
                   onChange={(e) => setFiles(Array.from(e.target.files ?? []))} data-testid="chat-file" />
               </label>
               <span className="flex-1 truncate text-xs text-muted-foreground">
-                {files.length ? files.map((f) => f.name).join(", ") : `Images & files up to ${maxFileSizeMb} MB`}
+                {files.length ? files.map((f) => f.name).join(", ") : tchat("filesUpTo", { mb: maxFileSizeMb })}
               </span>
-              <Button type="submit" disabled={sending} data-testid="chat-send"><Send /> {sending ? "Sending…" : type === "INTERNAL" ? "Add note" : "Send"}</Button>
+              <Button type="submit" disabled={sending} data-testid="chat-send"><Send /> {sending ? tchat("sending") : type === "INTERNAL" ? tchat("addNote") : tchat("send")}</Button>
             </div>
           </form>
         ) : (
-          <Alert>{perms.closed ? "This ticket is closed — the conversation is read-only." : "You can follow this conversation but only the requester and support team can post."}</Alert>
+          <Alert>{perms.closed ? tchat("thisTicketIsClosedTheConversation") : tchat("youCanFollowThisConversationBut")}</Alert>
         )}
       </CardContent>
     </Card>

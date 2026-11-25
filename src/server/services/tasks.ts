@@ -1,3 +1,4 @@
+import { nameTh, thTaskStatus } from "@/i18n/server-text";
 import { initialScanStatus } from "@/server/storage/malware-scan";
 import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
@@ -69,7 +70,7 @@ const ticketForTask = {
 async function loadTask(actor: Actor, taskId: string) {
   const task = await prisma.ticketTask.findFirst({
     where: { AND: [taskScopeWhere(actor), { OR: [{ id: taskId }, { number: taskId }] }] },
-    include: { ticket: ticketForTask, team: { select: { id: true, name: true } }, assignedAgent: { select: { id: true, displayName: true } } },
+    include: { ticket: ticketForTask, team: { select: { id: true, name: true, nameTh: true } }, assignedAgent: { select: { id: true, displayName: true } } },
   });
   if (!task) throw new NotFoundError("Task not found or you do not have access.");
   return task;
@@ -148,7 +149,7 @@ export async function createTask(actor: Actor, ticketId: string, raw: unknown) {
     });
     const recipients = input.agentId ? [input.agentId] : await teamMemberIds(tx, team.id);
     await notifyUsers(tx, recipients, {
-      type: input.agentId ? "TASK_ASSIGNED" : "TASK_CREATED", title: `New task ${number} on ${ticket.number}`, body: input.title,
+      type: input.agentId ? "TASK_ASSIGNED" : "TASK_CREATED", key: "taskNew", params: { task: number, number: ticket.number, title: input.title }, title: `New task ${number} on ${ticket.number}`, body: input.title,
       ticketId: ticket.id, link: taskLink(ticket.number, number),
     }, actor);
     return { id: task.id, number };
@@ -203,7 +204,7 @@ export async function updateTask(actor: Actor, taskId: string, raw: unknown) {
       oldValue: Object.fromEntries(changes.map((c) => [c.field, c.old])), newValue: Object.fromEntries(changes.map((c) => [c.field, c.neu])),
     });
     await notifyUsers(tx, [task.assignedAgentId], {
-      type: "TASK_UPDATED", title: `${task.number} updated`, body: changes.map((c) => c.field).join(", "),
+      type: "TASK_UPDATED", key: "taskUpdated", params: { task: task.number, fields: changes.map((c) => c.field).join(", ") }, title: `${task.number} updated`, body: changes.map((c) => c.field).join(", "),
       ticketId: task.ticketId, link: taskLink(task.ticket.number, task.number),
     }, actor);
   });
@@ -249,7 +250,7 @@ export async function changeTaskStatus(actor: Actor, taskId: string, input: { st
 
     const link = taskLink(task.ticket.number, task.number);
     await notifyUsers(tx, [task.assignedAgentId, task.ticket.assignedAgentId], {
-      type: "TASK_UPDATED", title: `${task.number}: ${TASK_STATUS_LABEL[task.status]} → ${TASK_STATUS_LABEL[to]}`, body: task.title,
+      type: "TASK_UPDATED", key: "taskStatus", params: { task: task.number, from: TASK_STATUS_LABEL[task.status], fromTh: thTaskStatus(task.status), to: TASK_STATUS_LABEL[to], toTh: thTaskStatus(to), title: task.title }, title: `${task.number}: ${TASK_STATUS_LABEL[task.status]} → ${TASK_STATUS_LABEL[to]}`, body: task.title,
       ticketId: task.ticketId, link,
     }, actor);
 
@@ -259,7 +260,7 @@ export async function changeTaskStatus(actor: Actor, taskId: string, input: { st
       if (progress.openRequired === 0) {
         const ownerLeads = task.ticket.assignedAgentId ? [task.ticket.assignedAgentId] : await teamMemberIds(tx, task.ticket.ownerTeamId, true);
         await notifyUsers(tx, ownerLeads, {
-          type: "TASK_UPDATED", title: `All required tasks completed on ${task.ticket.number}`, body: "The ticket can now be resolved.",
+          type: "TASK_UPDATED", key: "requiredTasksDone", params: { number: task.ticket.number }, title: `All required tasks completed on ${task.ticket.number}`, body: "The ticket can now be resolved.",
           ticketId: task.ticketId, link: `/admin/tickets/${task.ticket.number}`,
         }, actor);
       }
@@ -310,9 +311,9 @@ export async function assignTask(actor: Actor, taskId: string, input: { teamId?:
     });
     const link = taskLink(task.ticket.number, task.number);
     if (agentId) {
-      await notifyUsers(tx, [agentId], { type: "TASK_ASSIGNED", title: `${task.number} assigned to you`, body: task.title, ticketId: task.ticketId, link }, actor);
+      await notifyUsers(tx, [agentId], { type: "TASK_ASSIGNED", key: "taskAssignedYou", params: { task: task.number, title: task.title }, title: `${task.number} assigned to you`, body: task.title, ticketId: task.ticketId, link }, actor);
     } else if (teamChanged) {
-      await notifyUsers(tx, await teamMemberIds(tx, teamId), { type: "TASK_ASSIGNED", title: `${task.number} moved to ${team.name}`, body: task.title, ticketId: task.ticketId, link }, actor);
+      await notifyUsers(tx, await teamMemberIds(tx, teamId), { type: "TASK_ASSIGNED", key: "taskMoved", params: { task: task.number, team: team.name, teamTh: nameTh(team), title: task.title }, title: `${task.number} moved to ${team.name}`, body: task.title, ticketId: task.ticketId, link }, actor);
     }
   });
 }
@@ -371,10 +372,10 @@ export async function removeTaskAttachment(actor: Actor, attachmentId: string) {
 // ───────────────────────────── Read ─────────────────────────────
 
 export const taskRowInclude = {
-  ticket: { select: { id: true, number: true, subject: true, ownerTeamId: true, assignedAgentId: true, status: { select: { kind: true, name: true, color: true } } } },
-  team: { select: { id: true, name: true } },
+  ticket: { select: { id: true, number: true, subject: true, ownerTeamId: true, assignedAgentId: true, status: { select: { kind: true, name: true, nameTh: true, color: true } } } },
+  team: { select: { id: true, name: true, nameTh: true } },
   assignedAgent: { select: { id: true, displayName: true } },
-  priority: { select: { id: true, code: true, name: true, color: true } },
+  priority: { select: { id: true, code: true, name: true, nameTh: true, color: true } },
 } satisfies Prisma.TicketTaskInclude;
 export type TaskRow = Prisma.TicketTaskGetPayload<{ include: typeof taskRowInclude }>;
 
@@ -385,7 +386,7 @@ export async function getTicketTasks(actor: Actor, ticket: { id: string; ownerTe
     include: {
       ...taskRowInclude,
       history: { include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 100 },
-      assignments: { include: { team: { select: { name: true } }, agent: { select: { displayName: true } }, changedBy: { select: { displayName: true } } }, orderBy: { createdAt: "desc" } },
+      assignments: { include: { team: { select: { name: true, nameTh: true } }, agent: { select: { displayName: true } }, changedBy: { select: { displayName: true } } }, orderBy: { createdAt: "desc" } },
       attachments: { where: { deletedAt: null }, include: { uploadedBy: { select: { displayName: true } } }, orderBy: { createdAt: "asc" } },
     },
     orderBy: [{ createdAt: "asc" }],

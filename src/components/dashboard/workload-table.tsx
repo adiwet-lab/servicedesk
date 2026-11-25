@@ -1,17 +1,21 @@
 import Link from "next/link";
 import type { AgentWorkloadRow } from "@/server/services/analytics";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDuration } from "./widgets";
+import { useLocale, useTranslations } from "next-intl";
+import { makeFormat } from "@/lib/format";
+import type { Locale } from "@/i18n/config";
 
 export function WorkloadTable({ rows }: { rows: AgentWorkloadRow[] }) {
-  if (!rows.length) return <p className="py-6 text-center text-sm text-muted-foreground">No agents in scope.</p>;
+  const td = useTranslations("dash");
+  const f = makeFormat(useLocale() as Locale);
+  if (!rows.length) return <p className="py-6 text-center text-sm text-muted-foreground">{td("noAgentsInScope")}</p>;
   return (
     <Table className="mt-3 text-sm" data-testid="workload-table">
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead>Agent</TableHead><TableHead className="text-right">Assigned</TableHead><TableHead className="text-right">In progress</TableHead>
-          <TableHead className="text-right">Waiting</TableHead><TableHead className="text-right">Open tasks</TableHead><TableHead className="text-right">Overdue tasks</TableHead>
-          <TableHead className="text-right">Completed</TableHead><TableHead className="text-right">Avg resolution</TableHead>
+          <TableHead>{td("agent")}</TableHead><TableHead className="text-right">{td("assigned")}</TableHead><TableHead className="text-right">{td("inProgress")}</TableHead>
+          <TableHead className="text-right">{td("waiting")}</TableHead><TableHead className="text-right">{td("openTasks")}</TableHead><TableHead className="text-right">{td("overdueTasks")}</TableHead>
+          <TableHead className="text-right">{td("completed")}</TableHead><TableHead className="text-right">{td("avgResolution")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -24,7 +28,7 @@ export function WorkloadTable({ rows }: { rows: AgentWorkloadRow[] }) {
             <TableCell className="text-right tabular-nums">{r.openTasks}</TableCell>
             <TableCell className={`text-right tabular-nums ${r.overdueTasks ? "font-semibold text-destructive" : ""}`}>{r.overdueTasks}</TableCell>
             <TableCell className="text-right tabular-nums">{r.completed}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatDuration(r.avgResolutionMin)}</TableCell>
+            <TableCell className="text-right tabular-nums">{r.avgResolutionMin == null ? "—" : f.duration(r.avgResolutionMin)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

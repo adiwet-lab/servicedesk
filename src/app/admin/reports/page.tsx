@@ -12,11 +12,14 @@ import { Card } from "@/components/ui/card";
 import { Alert, PageHeader } from "@/components/ui/misc";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = { title: "Reports" };
+export const generateMetadata = pageTitle("reports");
 const PREVIEW = 50;
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   if (!can(actor, P.REPORT_EXPORT)) notFound();
   const params = await searchParams;
@@ -27,9 +30,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const keep = (t: string) => `/admin/reports?${new URLSearchParams({ ...Object.fromEntries(Object.entries(params).filter(([, v]) => v) as [string, string][]), type: t })}`;
   return (
     <div className="space-y-5">
-      <PageHeader title="Reports" description={<>Run and export reports — {isOrgWide(actor) ? "organisation-wide" : "limited to your teams and tickets"} · {dateWindow(filters).label}</>}
-        actions={<Button asChild data-testid="export-csv"><a href={`/api/reports/${type}${exportQuery ? `?${exportQuery}` : ""}`}><Download /> Export CSV</a></Button>} />
-      <nav className="flex flex-wrap gap-2" aria-label="Report type">
+      <PageHeader title={tcfg("reports")} description={<>{tcfg("reportsDesc", { scope: isOrgWide(actor) ? tcfg("organisationWide") : tcfg("limitedToYourTeamsAndTickets") })} · {dateWindow(filters).label}</>}
+        actions={<Button asChild data-testid="export-csv"><a href={`/api/reports/${type}${exportQuery ? `?${exportQuery}` : ""}`}><Download /> {tcfg("exportCsv")}</a></Button>} />
+      <nav className="flex flex-wrap gap-2" aria-label={tcfg("reportType")}>
         {(Object.entries(REPORT_TYPES) as [ReportType, (typeof REPORT_TYPES)[ReportType]][]).map(([k, v]) => (
           <Link key={k} href={keep(k)} className={cn("rounded-lg border px-3 py-2 text-sm", k === type ? "border-primary bg-primary/10 font-medium" : "bg-card hover:bg-accent")}
             aria-current={k === type ? "page" : undefined} data-testid={`report-${k}`}>{v.label}</Link>
@@ -37,18 +40,18 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </nav>
       <p className="text-sm text-muted-foreground">{REPORT_TYPES[type].description}</p>
       <FilterBar base="/admin/reports" params={params} options={options} hidden={{ type }} />
-      <Alert>Preview shows the first {PREVIEW} rows. Exports contain up to 50,000 rows, are limited to your data scope, never include chat messages or internal notes, and are recorded in the audit log.</Alert>
+      <Alert>{tcfg("reportsNote", { n: PREVIEW })}</Alert>
       <Card className="overflow-hidden">
         <Table className="text-xs" data-testid="report-preview">
           <TableHeader><TableRow className="hover:bg-transparent">{preview.headers.map((h) => <TableHead key={h} className="whitespace-nowrap">{h}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
-            {preview.rows.length === 0 && <TableRow><TableCell colSpan={preview.headers.length} className="py-8 text-center text-muted-foreground">No rows for the selected filters.</TableCell></TableRow>}
+            {preview.rows.length === 0 && <TableRow><TableCell colSpan={preview.headers.length} className="py-8 text-center text-muted-foreground">{tcfg("noRowsForTheSelectedFilters")}</TableCell></TableRow>}
             {preview.rows.map((r, i) => (
               <TableRow key={i}>{r.map((c, j) => <TableCell key={j} className="whitespace-nowrap py-1.5">{c ?? "—"}</TableCell>)}</TableRow>
             ))}
           </TableBody>
         </Table>
-        {preview.truncated && <p className="border-t px-3 py-2 text-xs text-muted-foreground">More rows available — export to CSV for the full report.</p>}
+        {preview.truncated && <p className="border-t px-3 py-2 text-xs text-muted-foreground">{tcfg("moreRowsAvailableExportToCsv")}</p>}
       </Card>
     </div>
   );
