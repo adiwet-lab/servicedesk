@@ -79,7 +79,7 @@ export function SlaTargetsForm({ profileId, rows: initial, businessDayMinutes }:
       <p className="text-xs text-muted-foreground">{tcfg("businessDayNote", { h: Math.round(businessDayMinutes / 6) / 10 })}</p>
       <Button disabled={pending} data-testid="save-targets" onClick={() => start(async () => {
         const res = await saveSlaTargetsAction(profileId, rows.map(({ priorityId, responseMinutes, resolutionMinutes, businessHoursOnly }) => ({ priorityId, responseMinutes, resolutionMinutes, businessHoursOnly })));
-        setMsg(res.ok ? { ok: true, text: "SLA targets saved." } : { ok: false, text: res.error });
+        setMsg(res.ok ? { ok: true, text: tcfg("targetsSaved") } : { ok: false, text: res.error });
         if (res.ok) router.refresh();
       })}>{pending ? tcfg("saving") : tcfg("saveTargets")}</Button>
     </div>

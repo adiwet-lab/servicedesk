@@ -1735,7 +1735,9 @@
     "clockName": {
       "RESPONSE": "response",
       "RESOLUTION": "resolution"
-    }
+    },
+    "bhSaved": "Business hours saved.",
+    "targetsSaved": "SLA targets saved."
   },
   "crud": {
     "1200EG75Warning": "1–200 (e.g. 75 = warning stage, 100 = breach, 150 = well overdue)",

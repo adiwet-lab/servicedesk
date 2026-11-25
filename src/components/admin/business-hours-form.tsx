@@ -70,7 +70,7 @@ export function BusinessHoursForm({ calendar, timezones }: { calendar: CalendarD
         </div>
         <Button disabled={pending} data-testid="save-business-hours" onClick={() => start(async () => {
           const res = await saveBusinessHoursAction(calendar.id, { name: c.name, timezone: c.timezone, isDefault: c.isDefault, schedule: c.schedule });
-          setMsg(res.ok ? { ok: true, text: "Business hours saved." } : { ok: false, text: res.error });
+          setMsg(res.ok ? { ok: true, text: tcfg("bhSaved") } : { ok: false, text: res.error });
           if (res.ok) router.refresh();
         })}>{pending ? tcfg("saving") : tcfg("saveCalendar")}</Button>
       </CardContent>
