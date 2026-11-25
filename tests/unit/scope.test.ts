@@ -79,7 +79,7 @@ describe("ticketScopeWhere — chat queue (Phase 9)", () => {
   it("employees and vendor staff do not", () => {
     expect(orBranches(ticketScopeWhere(makeActor("EMPLOYEE")))).not.toContainEqual(UNCLAIMED_CHAT);
     const vendor = makeActor("OUTSOURCE_SUPPORT", { tenantType: "VENDOR", teamIds: ["VA"] });
-    vendor.permissions.add("chat.queue" as never); // even if a role grants it by mistake
+    (vendor.permissions as Set<string>).add("chat.queue"); // even if a role grants it by mistake
     expect(orBranches(ticketScopeWhere(vendor))).not.toContainEqual(UNCLAIMED_CHAT);
   });
   it("the unclaimed-chat branch never includes confidential or closed tickets", () => {

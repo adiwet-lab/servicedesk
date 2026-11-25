@@ -11,7 +11,7 @@ import { Alert, Field } from "@/components/ui/misc";
 
 interface Transition { id: string; name: string; kind: string; color: string; requiresReason: boolean }
 
-export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { ticketId: string; transitions: Transition[]; blockingTasks?: { number: string; title: string }[] }) {
+export function StatusChanger({ ticketId, transitions, blockingTasks = [], asButtons = false }: { ticketId: string; transitions: Transition[]; blockingTasks?: { number: string; title: string }[]; /** Quick-reply buttons instead of a menu (chat). */ asButtons?: boolean }) {
   const tr = useTranslations("ticketActions");
   const [target, setTarget] = useState<Transition | null>(null);
   const [state, action, pending] = useActionState(changeStatusAction, null);
@@ -21,6 +21,15 @@ export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { t
 
   return (
     <>
+      {asButtons ? (
+        <div className="flex flex-wrap gap-2" data-testid="status-buttons">
+          {transitions.map((t) => (
+            <Button key={t.id} size="sm" variant="outline" className="rounded-full" onClick={() => setTarget(t)} data-testid={`status-${t.name}`}>
+              <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} /> {t.name}
+            </Button>
+          ))}
+        </div>
+      ) : (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button data-testid="change-status">{tr("changeStatus")} <ChevronDown /></Button>
@@ -33,6 +42,7 @@ export function StatusChanger({ ticketId, transitions, blockingTasks = [] }: { t
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
       <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
         <DialogContent>
           <DialogHeader>

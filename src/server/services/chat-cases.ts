@@ -32,7 +32,7 @@ export async function chatStartOptions(actor: Actor, locale: Locale = DEFAULT_LO
   return {
     categories: o.categories.map((c) => ({ id: c.id, name: c.name, requiredFields: c.requiredFields,
       children: c.children.map((s) => ({ id: s.id, name: s.name, requiredFields: s.requiredFields })) })),
-    branches: branches.map((b) => ({ id: b.id, name: b.name })),
+    branches: branches.map((b) => ({ id: b.id, name: b.name, locations: b.locations.map((l) => ({ id: l.id, name: l.name })) })),
     myBranchId: actor.branchId,
     maxFileSizeMb: o.maxFileSizeMb, maxFiles: o.maxFiles, allowedExtensions: o.allowedExtensions,
   };
