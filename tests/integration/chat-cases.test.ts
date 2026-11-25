@@ -43,6 +43,19 @@ describe("starting a chat case", () => {
     expect(msgs.messages.length).toBe(1);
   });
 
+  it("accepts a short first message (chat style), naming the case after the subcategory", async () => {
+    const r = await startChatCase(await actor("emma"), { categoryId: await cat("NW"), subcategoryId: await cat("NW-WIFI"), body: "เทส" });
+    const t = await prisma.ticket.findUniqueOrThrow({ where: { id: r.id }, include: { messages: true } });
+    expect(t.subject).toBe("Wi-Fi: เทส");
+    expect(t.description).toBe("เทส");
+    expect(t.messages[0]!.body).toBe("เทส");
+  });
+
+  it("still needs a message or a file", async () => {
+    await expect(startChatCase(await actor("emma"), { categoryId: await cat("NW"), subcategoryId: await cat("NW-WIFI"), body: "  " }))
+      .rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("enforces category rules (subcategory required) like the form", async () => {
     await expect(startChatCase(await actor("emma"), { categoryId: await cat("NW"), body: "No subcategory chosen here" })).rejects.toBeInstanceOf(ValidationError);
   });
