@@ -33,9 +33,9 @@ export function FilterBar({ base, params, options, hide = [], hidden = {} }: {
     const sp = new URLSearchParams(Object.entries(params).filter(([kk, v]) => kk !== k && v) as [string, string][]);
     return `${base}${sp.toString() ? `?${sp}` : ""}`;
   };
-  const sel = (name: string, label: string, opts: { id: string; name: string }[], extra?: React.ReactNode) => (
-    <NativeSelect name={name} defaultValue={params[name] ?? ""} className="h-8 w-40 text-xs" aria-label={label} data-testid={`filter-${name}`}>
-      <option value="">{td("allOf", { label: label.toLowerCase() })}</option>{extra}{opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+  const sel = (name: (typeof DIMS)[number], opts: { id: string; name: string }[], extra?: React.ReactNode) => (
+    <NativeSelect name={name} defaultValue={params[name] ?? ""} className="h-8 w-40 text-xs" aria-label={td(`dim.${name}`)} data-testid={`filter-${name}`}>
+      <option value="">{td(`allDim.${name}`)}</option>{extra}{opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
     </NativeSelect>
   );
   return (
@@ -52,10 +52,10 @@ export function FilterBar({ base, params, options, hide = [], hidden = {} }: {
             <Input type="date" name="to" defaultValue={params.to} className="h-8 w-36 text-xs" aria-label={td("to")} />
           </>
         )}
-        {show("company") && sel("company", "Companies", options.companies)}
-        {show("department") && sel("department", "Departments", options.departments)}
-        {show("branch") && sel("branch", "Branches", options.branches)}
-        {show("team") && sel("team", "Teams", options.teams)}
+        {show("company") && sel("company", options.companies)}
+        {show("department") && sel("department", options.departments)}
+        {show("branch") && sel("branch", options.branches)}
+        {show("team") && sel("team", options.teams)}
         {show("category") && (
           <NativeSelect name="category" value={category} onChange={(e) => setCategory(e.target.value)} className="h-8 w-40 text-xs" aria-label={td("categories")} data-testid="filter-category">
             <option value="">{td("allCategories")}</option>{options.categories.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
@@ -66,9 +66,9 @@ export function FilterBar({ base, params, options, hide = [], hidden = {} }: {
             <option value="">{td("allSubcategories")}</option>{subs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </NativeSelect>
         )}
-        {show("priority") && sel("priority", "Priorities", options.priorities.map((p) => ({ id: p.id, name: `${p.code} ${p.name}` })))}
-        {show("status") && sel("status", "Statuses", options.statuses)}
-        {show("agent") && sel("agent", "Agents", options.agents.map((a) => ({ id: a.id, name: a.displayName })), <option value="none">{td("unassigned")}</option>)}
+        {show("priority") && sel("priority", options.priorities.map((p) => ({ id: p.id, name: `${p.code} ${p.name}` })))}
+        {show("status") && sel("status", options.statuses)}
+        {show("agent") && sel("agent", options.agents.map((a) => ({ id: a.id, name: a.displayName })), <option value="none">{td("unassigned")}</option>)}
         <Button type="submit" size="sm" data-testid="filter-apply">{td("apply")}</Button>
         <Button asChild size="sm" variant="ghost"><Link href={`${base}${Object.keys(hidden).length ? `?${new URLSearchParams(hidden)}` : ""}`}>{td("reset")}</Link></Button>
       </form>
@@ -76,7 +76,7 @@ export function FilterBar({ base, params, options, hide = [], hidden = {} }: {
         <div className="flex flex-wrap gap-1.5" data-testid="active-filters">
           {active.map((d) => (
             <Link key={d} href={without(d)} className="inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-0.5 text-xs hover:bg-accent">
-              <span className="text-muted-foreground capitalize">{d}:</span> {names[d]?.get(params[d]!) ?? params[d]} <X className="size-3" aria-label={td("remove")} />
+              <span className="text-muted-foreground">{td(`dim.${d}`)}:</span> {names[d]?.get(params[d]!) ?? params[d]} <X className="size-3" aria-label={td("remove")} />
             </Link>
           ))}
         </div>

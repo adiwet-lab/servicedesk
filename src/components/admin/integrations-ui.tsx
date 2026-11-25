@@ -101,7 +101,7 @@ export function AssetConfigForm({ cfg }: { cfg: { provider: string; baseUrl: str
         <Input value={tag} onChange={(e) => setTag(e.target.value)} className="w-48" aria-label={tinteg("assetTagToTest")} />
         <Button size="sm" variant="outline" disabled={busy} onClick={() => start(async () => {
           const r = await testAssetAction(tag);
-          setTest(r.error ? `Error: ${r.error}` : r.asset ? `${r.asset.tag}: ${r.asset.model ?? r.asset.name ?? ""} · ${r.asset.status ?? ""}` : r.provider ? "Not found" : "Asset lookup is disabled");
+          setTest(r.error ? tinteg("testError", { err: r.error }) : r.asset ? `${r.asset.tag}: ${r.asset.model ?? r.asset.name ?? ""} · ${r.asset.status ?? ""}` : r.provider ? tinteg("assetNotFound") : tinteg("lookupDisabled"));
         })} data-testid="test-asset"><Search /> {tinteg("testLookup")}</Button>
         {test && <span className="text-sm" data-testid="asset-test-result">{test}</span>}
       </div>

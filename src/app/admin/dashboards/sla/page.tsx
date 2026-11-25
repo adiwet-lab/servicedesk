@@ -44,10 +44,10 @@ export default async function SlaDashboard({ searchParams }: { searchParams: Pro
       </div>
       <div className="grid gap-5 xl:grid-cols-2">
         <Panel title={td("complianceTrend")} description={td("perGranularity", { g: td(`gran.${s.window.granularity}`) })}>
-          <TrendLines data={s.trend} percent series={[{ key: "resolutionCompliance", label: "Resolution" }, { key: "responseCompliance", label: "Response" }]} />
+          <TrendLines data={s.trend} percent series={[{ key: "resolutionCompliance", label: td("chart.resolution") }, { key: "responseCompliance", label: td("chart.response") }]} />
         </Panel>
         <Panel title={td("resolvedWithinOutsideSla")} description={td("resolutionClock")}>
-          <StackedColumns data={s.trend.map((t) => ({ label: t.period, "Within SLA": t.met, Breached: t.breached }))} keys={[td("breached"), "Within SLA"]} />
+          <StackedColumns data={s.trend.map((t) => ({ label: t.period, [td("chart.withinSla")]: t.met, [td("chart.breached")]: t.breached }))} keys={[td("chart.breached"), td("chart.withinSla")]} />
         </Panel>
         <Panel title={td("complianceByPriority")}>{ct(s.byPriority, td("priority"))}</Panel>
         <Panel title={td("complianceByTeam")} description={td("lowestFirst")}>{ct(s.byTeam, td("team"))}</Panel>

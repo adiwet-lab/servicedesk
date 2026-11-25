@@ -1136,6 +1136,47 @@
       "sla": "SLA",
       "aging": "อายุทิกเก็ต",
       "workload": "ภาระงาน"
+    },
+    "dim": {
+      "company": "บริษัท",
+      "department": "แผนก",
+      "branch": "สาขา",
+      "team": "ทีม",
+      "category": "หมวดหมู่",
+      "subcategory": "หมวดหมู่ย่อย",
+      "priority": "ความสำคัญ",
+      "status": "สถานะ",
+      "agent": "เจ้าหน้าที่"
+    },
+    "allDim": {
+      "company": "ทุกบริษัท",
+      "department": "ทุกแผนก",
+      "branch": "ทุกสาขา",
+      "team": "ทุกทีม",
+      "category": "ทุกหมวดหมู่",
+      "subcategory": "ทุกหมวดหมู่ย่อย",
+      "priority": "ทุกระดับความสำคัญ",
+      "status": "ทุกสถานะ",
+      "agent": "เจ้าหน้าที่ทุกคน"
+    },
+    "chart": {
+      "created": "สร้าง",
+      "resolved": "แก้ไขแล้ว",
+      "resolution": "การแก้ไข",
+      "response": "การตอบรับ",
+      "assignedTickets": "ทิกเก็ตที่ได้รับมอบหมาย",
+      "openTasks": "งานย่อยที่เปิด",
+      "overdueTasks": "งานย่อยที่เกินกำหนด",
+      "completed": "เสร็จในช่วงเวลา",
+      "withinSla": "ทัน SLA",
+      "breached": "เกินกำหนด"
+    },
+    "slaState": {
+      "ON_TRACK": "อยู่ในเกณฑ์",
+      "WARNING": "ใกล้ครบ",
+      "BREACHED": "เกินกำหนด",
+      "PAUSED": "หยุดนับ",
+      "NONE": "ไม่มี SLA"
     }
   },
   "analytics": {
@@ -1269,7 +1310,9 @@
     "filesUpTo": "รูปภาพและไฟล์ ขนาดไม่เกิน {mb} MB",
     "unreadCount": "ยังไม่อ่าน",
     "requesterName": "ผู้แจ้ง: {name}",
-    "pager": "{n} การสนทนา · หน้า {page} จาก {pages}"
+    "pager": "{n} การสนทนา · หน้า {page} จาก {pages}",
+    "inboxStaffDesc": "การสนทนาในทิกเก็ตที่คุณเข้าถึงได้ ล่าสุดก่อน บันทึกภายในแสดงเฉพาะเจ้าหน้าที่ที่มีสิทธิ์",
+    "inboxMineDesc": "การสนทนากับฝ่ายไอทีเกี่ยวกับทิกเก็ตของคุณ"
   },
   "tasksPage": {
     "taskNoTitleTicketNoOr": "เลขงานย่อย ชื่อ เลขทิกเก็ต หรือหัวข้อ",
@@ -1434,7 +1477,10 @@
     "webhookFor": "Teams webhook ของ {team}",
     "apiKeyLabel": "API key",
     "apiKeyKeep": "API key (ตั้งค่าแล้ว — เว้นว่างเพื่อคงเดิม)",
-    "includeNames": "รวมชื่อและหัวข้อ"
+    "includeNames": "รวมชื่อและหัวข้อ",
+    "testError": "ข้อผิดพลาด: {err}",
+    "assetNotFound": "ไม่พบ",
+    "lookupDisabled": "ปิดการค้นหาทรัพย์สินอยู่"
   },
   "notifSettings": {
     "notificationSettings": "ตั้งค่าการแจ้งเตือน",
@@ -1737,7 +1783,11 @@
       "RESOLUTION": "การแก้ไข"
     },
     "bhSaved": "บันทึกเวลาทำการแล้ว",
-    "targetsSaved": "บันทึกเป้าหมาย SLA แล้ว"
+    "targetsSaved": "บันทึกเป้าหมาย SLA แล้ว",
+    "targetsLink": "เป้าหมาย",
+    "membersLink": "สมาชิก",
+    "comingSoon": "เร็ว ๆ นี้",
+    "laterPhase": "เฟสถัดไป"
   },
   "crud": {
     "1200EG75Warning": "1–200 (เช่น 75 = ระยะเตือน, 100 = เกินกำหนด, 150 = เกินกำหนดมาก)",
@@ -1871,7 +1921,14 @@
     "whenPriorityIs": "เมื่อความสำคัญคือ",
     "nameTh": "ชื่อ (ไทย)",
     "thaiDisplayNameLeaveEmptyTo": "ชื่อที่แสดงเป็นภาษาไทย เว้นว่างเพื่อแสดงชื่อภาษาอังกฤษ",
-    "single": "รายการเดียว"
+    "single": "รายการเดียว",
+    "xContactNumber": "เบอร์ติดต่อ",
+    "xRelatedAsset": "ทรัพย์สินที่เกี่ยวข้อง",
+    "xAffectedSystem": "ระบบที่ได้รับผลกระทบ",
+    "xAffectedUsers": "ผู้ได้รับผลกระทบ",
+    "xLocation": "สถานที่",
+    "xAttachments": "ไฟล์แนบ",
+    "xInherit": "(ใช้ค่าจากหมวดหมู่หลัก)"
   },
   "crudMsg": {
     "required": "กรุณาระบุ{label}",
@@ -2186,7 +2243,13 @@
     "arRoles": "บทบาท",
     "arPrivileges": "สิทธิ์พิเศษ",
     "arLastLoginUsed": "เข้าสู่ระบบ / ใช้ล่าสุด",
-    "arAccessExpires": "สิทธิ์หมดอายุ"
+    "arAccessExpires": "สิทธิ์หมดอายุ",
+    "fldContactNumber": "เบอร์ติดต่อ",
+    "fldRelatedAsset": "ทรัพย์สินที่เกี่ยวข้อง",
+    "fldAffectedSystem": "ระบบที่ได้รับผลกระทบ",
+    "fldAffectedUsers": "ผู้ได้รับผลกระทบ",
+    "fldLocation": "สถานที่",
+    "fldAttachments": "ไฟล์แนบ"
   },
   "srvTpl": {
     "hostNotAllowed": "{err} กรุณาเพิ่มโฮสต์ใน INTEGRATIONS_ALLOWED_HOSTS",
@@ -2215,7 +2278,8 @@
     "cardMiStatus": "เหตุขัดข้องร้ายแรง {number}: {status}",
     "cardMiResolved": "✅ แก้ไขเหตุขัดข้องร้ายแรงแล้ว: {number}",
     "noApprover": "ไม่มีผู้อนุมัติสำหรับขั้นตอน \"{name}\" กรุณาติดต่อฝ่ายไอที",
-    "stepChooseApprover": "ขั้นตอนที่ {n}: กรุณาเลือกผู้อนุมัติ"
+    "stepChooseApprover": "ขั้นตอนที่ {n}: กรุณาเลือกผู้อนุมัติ",
+    "fieldRequiredForCategory": "กรุณาระบุ{field}สำหรับหมวดหมู่นี้"
   },
   "validation": {
     "kbOneLanguage": "กรุณากรอกชื่อและเนื้อหาอย่างน้อยหนึ่งภาษา",
@@ -2242,6 +2306,32 @@
     "categories": {
       "label": "สรุปตามหมวดหมู่",
       "description": "ปริมาณ เวลาแก้ไขเฉลี่ย และอัตราทัน SLA ตามหมวดหมู่ / หมวดหมู่ย่อย"
+    }
+  },
+  "adminTickets": {
+    "all": {
+      "title": "ทิกเก็ตทั้งหมด",
+      "desc": "ทิกเก็ตทุกรายการในขอบเขตที่คุณเข้าถึงได้"
+    },
+    "unassigned": {
+      "title": "ทิกเก็ตที่ยังไม่มอบหมาย",
+      "desc": "ทิกเก็ตที่เปิดอยู่และรอเจ้าหน้าที่รับงาน"
+    },
+    "myteam": {
+      "title": "ทิกเก็ตของทีมฉัน",
+      "desc": "ทิกเก็ตที่ทีมสนับสนุนของคุณรับผิดชอบ"
+    },
+    "assigned": {
+      "title": "มอบหมายให้ฉัน",
+      "desc": "ทิกเก็ตที่คุณเป็นเจ้าหน้าที่ผู้รับผิดชอบ"
+    },
+    "overdue": {
+      "title": "ทิกเก็ตที่เกินกำหนด",
+      "desc": "ทิกเก็ตที่เปิดอยู่และเลยวันครบกำหนดแก้ไข"
+    },
+    "breached": {
+      "title": "เกิน SLA",
+      "desc": "ทิกเก็ตที่เกินหรือกำลังจะเกิน SLA"
     }
   }
 }

@@ -256,7 +256,7 @@ const ENTITIES = {
         values: { parentId: r.parentId, code: r.code, name: r.name, nameTh: r.nameTh, description: r.description, defaultTeamId: r.defaultTeamId,
           defaultPriorityId: r.defaultPriorityId, slaProfileId: r.slaProfileId, requiredFields: r.requiredFields, sortOrder: r.sortOrder },
         cells: { path: r.parent ? `↳ ${r.name}` : r.name, nameTh: r.nameTh ?? "—", code: r.code, team: r.defaultTeam?.name ?? (r.parent ? "(inherit)" : "—"),
-          priority: r.defaultPriority?.code ?? "—", required: ((r.requiredFields as string[]) ?? []).join(", ") || "—" },
+          priority: r.defaultPriority?.code ?? "—", required: ((r.requiredFields as string[]) ?? []).map((k) => CONFIGURABLE_REQUIRED_FIELDS[k as keyof typeof CONFIGURABLE_REQUIRED_FIELDS] ?? k).join(", ") || "—" },
       }));
     },
     async save(tx, id, v) {
@@ -601,7 +601,9 @@ export async function loadCrudPage(actor: Actor, key: EntityKey, locale: Locale 
   const [fields, rows] = await Promise.all([e.fields(), e.list()]);
   return {
     key, title: tr(e.title), singular: tr(e.singular), description: e.description ? tr(e.description) : null,
-    fields: localizeFields(fields, tr), columns: e.columns.map((c) => ({ ...c, label: tr(c.label) })), rows, canToggle: !!e.setActive,
+    fields: localizeFields(fields, tr), columns: e.columns.map((c) => ({ ...c, label: tr(c.label) })), canToggle: !!e.setActive,
+    // Fixed texts in cells (e.g. "(inherit)", required-field names) are translated; record names pass through.
+    rows: locale === "en" ? rows : rows.map((r) => ({ ...r, cells: Object.fromEntries(Object.entries(r.cells).map(([k, v]) => [k, typeof v === "string" ? v.split(", ").map(tr).join(", ") : v])) })),
   };
 }
 

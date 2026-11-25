@@ -44,7 +44,7 @@ export default async function TeamDashboard({ searchParams }: { searchParams: Pr
       </div>
       <Panel title={td("agentWorkload")} description={td("openTicketsAndTasksPerTeam")}>
         <GroupedBars data={w.agents.map((a) => ({ name: a.name, assigned: a.assigned, openTasks: a.openTasks, overdueTasks: a.overdueTasks }))}
-          series={[{ key: "assigned", label: "Assigned tickets" }, { key: "openTasks", label: "Open tasks" }, { key: "overdueTasks", label: "Overdue tasks" }]} />
+          series={[{ key: "assigned", label: td("chart.assignedTickets") }, { key: "openTasks", label: td("chart.openTasks") }, { key: "overdueTasks", label: td("chart.overdueTasks") }]} />
         <WorkloadTable rows={w.agents} />
       </Panel>
       <div className="grid gap-5 xl:grid-cols-2">
@@ -54,8 +54,8 @@ export default async function TeamDashboard({ searchParams }: { searchParams: Pr
         <Panel title={td("openTicketsBySlaState")}>
           <Table className="text-sm">
             <TableBody>
-              {([["ON_TRACK", "On track"], ["WARNING", "Warning"], ["BREACHED", "Breached"], ["PAUSED", "Paused"], ["NONE", "No SLA"]] as const).map(([k, l]) => (
-                <TableRow key={k}><TableCell>{l}</TableCell><TableCell className="text-right tabular-nums font-medium">{sla.openStates[k]}</TableCell></TableRow>
+              {(["ON_TRACK", "WARNING", "BREACHED", "PAUSED", "NONE"] as const).map((k) => (
+                <TableRow key={k}><TableCell>{td(`slaState.${k}`)}</TableCell><TableCell className="text-right tabular-nums font-medium">{sla.openStates[k]}</TableCell></TableRow>
               ))}
             </TableBody>
           </Table>

@@ -7,7 +7,7 @@ import type { Locale } from "./config";
  * values use the `srvTpl` patterns ({name} = any text); `validation.*` strings are catalog keys.
  * Text without a translation is returned unchanged (English).
  */
-const TERM_PARAMS = new Set(["clock", "status"]);
+const TERM_PARAMS = new Set(["clock", "status", "field"]);
 type Entry = { re: RegExp; names: string[]; target: string };
 const cache = new Map<Locale, { exact: Map<string, string>; patterns: Entry[]; validation: Record<string, string> }>();
 

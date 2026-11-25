@@ -46,10 +46,10 @@ export default async function ManagementDashboard({ searchParams }: { searchPara
       </div>
       <div className="grid gap-5 xl:grid-cols-2">
         <Panel title={td("ticketTrend")} description={td("createdVsResolvedPer", { g: td(`gran.${o.window.granularity}`) })}>
-          <TrendLines data={o.trend} series={[{ key: td("created"), label: "Created" }, { key: td("resolved"), label: td("resolved_") }]} />
+          <TrendLines data={o.trend} series={[{ key: "created", label: td("chart.created") }, { key: "resolved", label: td("chart.resolved") }]} />
         </Panel>
         <Panel title={td("slaPerformance")} description={td("resolutionResponseCompliancePerPeriod")}>
-          <TrendLines data={sla.trend} percent series={[{ key: "resolutionCompliance", label: "Resolution" }, { key: "responseCompliance", label: "Response" }]} />
+          <TrendLines data={sla.trend} percent series={[{ key: "resolutionCompliance", label: td("chart.resolution") }, { key: "responseCompliance", label: td("chart.response") }]} />
         </Panel>
         <Panel title={td("ticketsByStatus")}>
           <BarList data={o.byStatus} useEntityColor />

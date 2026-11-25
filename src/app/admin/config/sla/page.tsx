@@ -15,7 +15,7 @@ export default async function SlaProfilesPage() {
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_SLA)) notFound();
   return CrudPage({
-    actor, entity: "slaProfiles", rowLink: { label: "Targets", hrefPrefix: "/admin/config/sla/" },
+    actor, entity: "slaProfiles", rowLink: { label: tcfg("targetsLink"), hrefPrefix: "/admin/config/sla/" },
     extra: (
       <div className="mb-4 space-y-3">
         <Alert>

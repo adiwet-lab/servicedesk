@@ -11,7 +11,7 @@ export default async function SoonPage({ params }: { params: Promise<{ slug: str
   const tcfg = await getTranslations("cfg");
   await requireAdminPortal();
   const { slug } = await params;
-  const [title, phase, desc] = FEATURES[slug] ?? ["Coming soon", "a later phase", ""];
+  const [title, phase, desc] = FEATURES[slug] ?? [tcfg("comingSoon"), tcfg("laterPhase"), ""];
   return (
     <div>
       <PageHeader title={title} />

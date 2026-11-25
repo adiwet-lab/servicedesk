@@ -1136,6 +1136,47 @@
       "sla": "SLA",
       "aging": "Ticket aging",
       "workload": "Workload"
+    },
+    "dim": {
+      "company": "Company",
+      "department": "Department",
+      "branch": "Branch",
+      "team": "Team",
+      "category": "Category",
+      "subcategory": "Subcategory",
+      "priority": "Priority",
+      "status": "Status",
+      "agent": "Agent"
+    },
+    "allDim": {
+      "company": "All companies",
+      "department": "All departments",
+      "branch": "All branches",
+      "team": "All teams",
+      "category": "All categories",
+      "subcategory": "All subcategories",
+      "priority": "All priorities",
+      "status": "All statuses",
+      "agent": "All agents"
+    },
+    "chart": {
+      "created": "Created",
+      "resolved": "Resolved",
+      "resolution": "Resolution",
+      "response": "Response",
+      "assignedTickets": "Assigned tickets",
+      "openTasks": "Open tasks",
+      "overdueTasks": "Overdue tasks",
+      "completed": "Completed in period",
+      "withinSla": "Within SLA",
+      "breached": "Breached"
+    },
+    "slaState": {
+      "ON_TRACK": "On track",
+      "WARNING": "Warning",
+      "BREACHED": "Breached",
+      "PAUSED": "Paused",
+      "NONE": "No SLA"
     }
   },
   "analytics": {
@@ -1269,7 +1310,9 @@
     "filesUpTo": "Images & files up to {mb} MB",
     "unreadCount": "Unread",
     "requesterName": "Requester: {name}",
-    "pager": "{n, plural, one {# conversation} other {# conversations}} · page {page} of {pages}"
+    "pager": "{n, plural, one {# conversation} other {# conversations}} · page {page} of {pages}",
+    "inboxStaffDesc": "Ticket conversations you can access, newest first. Internal notes are only shown to authorized staff.",
+    "inboxMineDesc": "Conversations with IT Support about your tickets."
   },
   "tasksPage": {
     "taskNoTitleTicketNoOr": "Task no., title, ticket no. or subject",
@@ -1434,7 +1477,10 @@
     "webhookFor": "Teams webhook for {team}",
     "apiKeyLabel": "API key",
     "apiKeyKeep": "API key (set — leave blank to keep)",
-    "includeNames": "Include names & subjects"
+    "includeNames": "Include names & subjects",
+    "testError": "Error: {err}",
+    "assetNotFound": "Not found",
+    "lookupDisabled": "Asset lookup is disabled"
   },
   "notifSettings": {
     "notificationSettings": "Notification Settings",
@@ -1737,7 +1783,11 @@
       "RESOLUTION": "resolution"
     },
     "bhSaved": "Business hours saved.",
-    "targetsSaved": "SLA targets saved."
+    "targetsSaved": "SLA targets saved.",
+    "targetsLink": "Targets",
+    "membersLink": "Members",
+    "comingSoon": "Coming soon",
+    "laterPhase": "a later phase"
   },
   "crud": {
     "1200EG75Warning": "1–200 (e.g. 75 = warning stage, 100 = breach, 150 = well overdue)",
@@ -1871,7 +1921,14 @@
     "whenPriorityIs": "When priority is",
     "nameTh": "Name (TH)",
     "thaiDisplayNameLeaveEmptyTo": "Thai display name. Leave empty to show the English name.",
-    "single": "Single"
+    "single": "Single",
+    "xContactNumber": "Contact Number",
+    "xRelatedAsset": "Related Asset",
+    "xAffectedSystem": "Affected System",
+    "xAffectedUsers": "Affected Users",
+    "xLocation": "Location",
+    "xAttachments": "Attachments",
+    "xInherit": "(inherit)"
   },
   "crudMsg": {
     "required": "{label} is required",
@@ -2186,7 +2243,13 @@
     "arRoles": "Roles",
     "arPrivileges": "Privileges",
     "arLastLoginUsed": "Last login / used",
-    "arAccessExpires": "Access expires"
+    "arAccessExpires": "Access expires",
+    "fldContactNumber": "Contact Number",
+    "fldRelatedAsset": "Related Asset",
+    "fldAffectedSystem": "Affected System",
+    "fldAffectedUsers": "Affected Users",
+    "fldLocation": "Location",
+    "fldAttachments": "Attachments"
   },
   "srvTpl": {
     "hostNotAllowed": "{err} Add the host to INTEGRATIONS_ALLOWED_HOSTS.",
@@ -2215,7 +2278,8 @@
     "cardMiStatus": "Major incident {number}: {status}",
     "cardMiResolved": "✅ Major incident resolved: {number}",
     "noApprover": "No approver is available for the approval step \"{name}\". Please contact IT.",
-    "stepChooseApprover": "Step {n}: choose the approver"
+    "stepChooseApprover": "Step {n}: choose the approver",
+    "fieldRequiredForCategory": "{field} is required for this category"
   },
   "validation": {
     "kbOneLanguage": "Enter the title and body in at least one language.",
@@ -2242,6 +2306,32 @@
     "categories": {
       "label": "Category summary",
       "description": "Volume, average resolution and compliance per category / subcategory."
+    }
+  },
+  "adminTickets": {
+    "all": {
+      "title": "All Tickets",
+      "desc": "Every ticket within your access scope."
+    },
+    "unassigned": {
+      "title": "Unassigned Tickets",
+      "desc": "Open tickets waiting for an agent."
+    },
+    "myteam": {
+      "title": "My Team Tickets",
+      "desc": "Tickets owned by your support teams."
+    },
+    "assigned": {
+      "title": "Assigned to Me",
+      "desc": "Tickets where you are the responsible agent."
+    },
+    "overdue": {
+      "title": "Overdue Tickets",
+      "desc": "Open tickets past their resolution due date."
+    },
+    "breached": {
+      "title": "SLA Breached",
+      "desc": "Tickets that breached or are breaching SLA."
     }
   }
 }

@@ -22,7 +22,7 @@ export default async function WorkloadDashboard({ searchParams }: { searchParams
       params={params} options={options} filters={filters} hide={["agent", "status"]}>
       <Panel title={td("agentWorkload")}>
         <GroupedBars data={w.agents.slice(0, 25).map((a) => ({ name: a.name, assigned: a.assigned, openTasks: a.openTasks, completed: a.completed }))}
-          series={[{ key: "assigned", label: "Assigned tickets" }, { key: "openTasks", label: "Open tasks" }, { key: "completed", label: "Completed in period" }]} />
+          series={[{ key: "assigned", label: td("chart.assignedTickets") }, { key: "openTasks", label: td("chart.openTasks") }, { key: "completed", label: td("chart.completed") }]} />
         <WorkloadTable rows={w.agents} />
       </Panel>
       <Panel title={td("teams")}>
