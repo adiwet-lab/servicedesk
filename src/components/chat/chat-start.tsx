@@ -101,7 +101,7 @@ export function ChatStart({ options, followUps, userName, initial = "welcome" }:
     setError(null);
     start(async () => {
       const r = await startChatCaseAction(null, fd);
-      if (!r.ok) { setError(r.error); return; }
+      if (!r.ok) { setError(Object.values(r.fieldErrors ?? {})[0] ?? r.error); return; }
       router.push(`/chat?t=${encodeURIComponent(r.data!.number)}&created=1`);
     });
   }

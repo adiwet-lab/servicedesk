@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { nameTh } from "@/i18n/server-text";
 import { randomUUID, createHash } from "node:crypto";
 import type { Prisma, StatusKind } from "@prisma/client";
@@ -275,7 +276,11 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
   requirePermission(actor, P.TICKET_CREATE);
   await enforceRateLimit(`ticket:create:${actor.id}`, 20, 60 * 60 * 1000);
 
-  const parsed = createTicketSchema.safeParse(raw);
+  // Chat cases are conversations: a short first message ("printer broken") is fine — the agent asks for more.
+  const schema = channel === "CHAT"
+    ? createTicketSchema.extend({ subject: z.string().trim().min(1).max(200), description: z.string().trim().min(1, "Write a message or attach a file.").max(20000) })
+    : createTicketSchema;
+  const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
