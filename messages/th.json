@@ -705,6 +705,10 @@
     "attachmentBlocked": {
       "title": "ไฟล์แนบถูกบล็อก: {file}",
       "body": "ตรวจพบมัลแวร์ ไม่สามารถดาวน์โหลดไฟล์นี้ได้"
+    },
+    "chatClaimed": {
+      "title": "{agent} รับเรื่อง {number} แล้ว",
+      "body": "{subject}"
     }
   },
   "clock": {
@@ -2249,7 +2253,11 @@
     "fldAffectedSystem": "ระบบที่ได้รับผลกระทบ",
     "fldAffectedUsers": "ผู้ได้รับผลกระทบ",
     "fldLocation": "สถานที่",
-    "fldAttachments": "ไฟล์แนบ"
+    "fldAttachments": "ไฟล์แนบ",
+    "chatOnlyClaim": "รับได้เฉพาะเคสที่แจ้งผ่านแชท",
+    "chatAlreadyClaimed": "แชทนี้มีเจ้าหน้าที่คนอื่นรับไปแล้ว",
+    "chatNoTeam": "คุณยังไม่ได้อยู่ในทีมสนับสนุนใด",
+    "chatChooseTeam": "กรุณาเลือกทีมที่จะรับแชทนี้"
   },
   "srvTpl": {
     "hostNotAllowed": "{err} กรุณาเพิ่มโฮสต์ใน INTEGRATIONS_ALLOWED_HOSTS",

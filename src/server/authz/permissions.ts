@@ -19,6 +19,8 @@ export const PERMISSIONS = {
   // Notes & chat
   NOTE_INTERNAL_READ: "note.internal.read",
   NOTE_INTERNAL_WRITE: "note.internal.write",
+  /** Phase 9: see and claim unclaimed chat cases of every team. */
+  CHAT_QUEUE: "chat.queue",
   // Tasks (Phase 2)
   TASK_READ: "task.read",
   TASK_MANAGE: "task.manage",
@@ -58,6 +60,7 @@ export const PERMISSION_META: Record<PermissionCode, { group: string; descriptio
   "ticket.escalate": { group: "Tickets", description: "Escalate tickets" },
   "ticket.confidential.read": { group: "Tickets", description: "View confidential tickets outside own involvement" },
   "ticket.closed.edit": { group: "Tickets", description: "Edit or reopen closed tickets" },
+  "chat.queue": { group: "Communication", description: "See and claim new (unclaimed) chat cases of all teams" },
   "note.internal.read": { group: "Communication", description: "Read internal notes" },
   "note.internal.write": { group: "Communication", description: "Write internal notes" },
   "task.read": { group: "Tasks", description: "View tasks" },
@@ -98,7 +101,7 @@ export type RoleCode = (typeof ROLE_CODES)[keyof typeof ROLE_CODES];
 const P = PERMISSIONS;
 const SUPPORT_BASE: PermissionCode[] = [
   P.TICKET_CREATE, P.TICKET_READ_OWN, P.TICKET_READ_TEAM, P.TICKET_UPDATE, P.TICKET_ASSIGN,
-  P.NOTE_INTERNAL_READ, P.NOTE_INTERNAL_WRITE, P.TASK_READ, P.TASK_MANAGE, P.DASHBOARD_SUPPORT, P.KB_WRITE,
+  P.NOTE_INTERNAL_READ, P.NOTE_INTERNAL_WRITE, P.TASK_READ, P.TASK_MANAGE, P.DASHBOARD_SUPPORT, P.KB_WRITE, P.CHAT_QUEUE,
 ];
 
 /** Default role → permissions mapping used by the seed. */
@@ -149,6 +152,7 @@ export const VENDOR_FORBIDDEN_PERMISSIONS: PermissionCode[] = [
   P.TICKET_CONFIDENTIAL_READ,
   P.NOTE_INTERNAL_READ,
   P.NOTE_INTERNAL_WRITE,
+  P.CHAT_QUEUE,
   P.DASHBOARD_MANAGEMENT,
   P.ADMIN_CATEGORIES, P.ADMIN_WORKFLOW, P.ADMIN_SLA, P.ADMIN_ORG, P.ADMIN_TEAMS,
   P.ADMIN_USERS, P.ADMIN_ROLES, P.ADMIN_TENANTS, P.ADMIN_SETTINGS, P.AUDIT_READ,

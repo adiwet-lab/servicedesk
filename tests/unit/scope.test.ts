@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { canAssignTicket, canWorkTicket, messageScopeWhere, ticketScopeWhere } from "@/server/authz/scope";
+import { canAssignTicket, canWorkTicket, messageScopeWhere, ticketScopeWhere, UNCLAIMED_CHAT } from "@/server/authz/scope";
 import { makeActor } from "./helpers";
 
 const APPROVER = { approvals: { some: { approverId: "u1", decision: { not: "WAITING" } } } };
 /** Flattens the OR branches of the visibility clause (minus the approver branch) for easy assertions. */
+/** The confidential clause is the OR that starts with exactly { isConfidential: false }. */
+function isConfidentialClause(c: object) {
+  return JSON.stringify((c as { OR: object[] }).OR[0]) === JSON.stringify({ isConfidential: false });
+}
 function orBranches(where: ReturnType<typeof ticketScopeWhere>) {
   const and = (where.AND as object[]) ?? [];
-  const vis = and.find((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => "requesterId" in o || "ownerTeamId" in o || "assignedAgentId" in o || "approvals" in o) && !(c as { OR: object[] }).OR.some((o) => "isConfidential" in o)) as { OR: object[] } | undefined;
+  const vis = and.find((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => "requesterId" in o || "ownerTeamId" in o || "assignedAgentId" in o || "approvals" in o) && !isConfidentialClause(c)) as { OR: object[] } | undefined;
   return (vis?.OR ?? []).filter((o) => !("approvals" in o));
 }
 function hasApproverBranch(where: ReturnType<typeof ticketScopeWhere>) {
-  return ((where.AND as object[]) ?? []).some((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => JSON.stringify(o) === JSON.stringify(APPROVER)) && !(c as { OR: object[] }).OR.some((o) => "isConfidential" in o));
+  return ((where.AND as object[]) ?? []).some((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => JSON.stringify(o) === JSON.stringify(APPROVER)) && !isConfidentialClause(c));
 }
 function confidentialClause(where: ReturnType<typeof ticketScopeWhere>) {
   return ((where.AND as object[]) ?? []).find((c) => "OR" in c && (c as { OR: object[] }).OR.some((o) => "isConfidential" in o));
@@ -65,6 +69,21 @@ describe("ticketScopeWhere — support staff", () => {
   });
   it("system admin (read.all + confidential.read) has no restrictions beyond soft-delete", () => {
     expect(ticketScopeWhere(makeActor("SYSTEM_ADMIN"))).toEqual({ AND: [{ deletedAt: null }] });
+  });
+});
+
+describe("ticketScopeWhere — chat queue (Phase 9)", () => {
+  it("internal support staff also see unclaimed chat cases of every team", () => {
+    expect(orBranches(ticketScopeWhere(makeActor("SUPPORT_AGENT", { teamIds: ["T1"] })))).toContainEqual(UNCLAIMED_CHAT);
+  });
+  it("employees and vendor staff do not", () => {
+    expect(orBranches(ticketScopeWhere(makeActor("EMPLOYEE")))).not.toContainEqual(UNCLAIMED_CHAT);
+    const vendor = makeActor("OUTSOURCE_SUPPORT", { tenantType: "VENDOR", teamIds: ["VA"] });
+    vendor.permissions.add("chat.queue" as never); // even if a role grants it by mistake
+    expect(orBranches(ticketScopeWhere(vendor))).not.toContainEqual(UNCLAIMED_CHAT);
+  });
+  it("the unclaimed-chat branch never includes confidential or closed tickets", () => {
+    expect(UNCLAIMED_CHAT).toMatchObject({ channel: "CHAT", assignedAgentId: null, isConfidential: false, status: { kind: { notIn: ["CLOSED", "CANCELLED"] } } });
   });
 });
 

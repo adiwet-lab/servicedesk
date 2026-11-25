@@ -705,6 +705,10 @@
     "attachmentBlocked": {
       "title": "Attachment blocked: {file}",
       "body": "Malware was detected; the file cannot be downloaded."
+    },
+    "chatClaimed": {
+      "title": "{agent} is handling {number}",
+      "body": "{subject}"
     }
   },
   "clock": {
@@ -2249,7 +2253,11 @@
     "fldAffectedSystem": "Affected System",
     "fldAffectedUsers": "Affected Users",
     "fldLocation": "Location",
-    "fldAttachments": "Attachments"
+    "fldAttachments": "Attachments",
+    "chatOnlyClaim": "Only chat cases can be claimed.",
+    "chatAlreadyClaimed": "This chat has already been claimed by someone else.",
+    "chatNoTeam": "You are not a member of any support team.",
+    "chatChooseTeam": "Choose the team that takes this chat."
   },
   "srvTpl": {
     "hostNotAllowed": "{err} Add the host to INTEGRATIONS_ALLOWED_HOSTS.",
