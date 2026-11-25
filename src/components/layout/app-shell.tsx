@@ -17,14 +17,14 @@ import { LiveIndicator, RealtimeProvider, useRealtimeContext } from "@/component
 export interface ShellUser { name: string; email: string; roles: { code: string; name: string }[]; tenant: string; vendor: boolean }
 
 type ShellProps = {
-  nav: NavSection[]; user: ShellUser; unread: number; unreadMessages: number; portal: "user" | "admin"; canSwitch: boolean;
+  nav: NavSection[]; user: ShellUser; unread: number; unreadMessages: number; unclaimedChats?: number; portal: "user" | "admin"; canSwitch: boolean;
   signOutAction: () => Promise<void>; children: React.ReactNode;
 };
 
 export function AppShell(props: ShellProps) {
   return (
     <Toaster>
-      <RealtimeProvider initialBadges={{ notifications: props.unread, messages: props.unreadMessages }}>
+      <RealtimeProvider initialBadges={{ notifications: props.unread, messages: props.unreadMessages, chatQueue: props.unclaimedChats ?? 0 }}>
         <ShellInner {...props} />
       </RealtimeProvider>
     </Toaster>
@@ -81,6 +81,9 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
                       <span className="flex-1 truncate">{t(item.label as never)}</span>
                       {item.badge === "messages" && badges.messages > 0 && (
                         <span className="rounded-full bg-sidebar-primary px-1.5 text-[10px] font-semibold text-sidebar" data-testid="nav-messages-badge">{badges.messages}</span>
+                      )}
+                      {item.href === "/admin/chat" && (badges.chatQueue ?? 0) > 0 && (
+                        <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white" title={t("nav.chatQueueBadge")} data-testid="nav-chat-queue-badge">{badges.chatQueue}</span>
                       )}
                       {item.soon && <span className="rounded bg-white/10 px-1.5 text-[10px] text-sidebar-muted">{item.soon}</span>}
                     </Link>

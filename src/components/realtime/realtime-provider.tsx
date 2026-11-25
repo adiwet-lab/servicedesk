@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { renderNotification } from "@/i18n/notifications";
 
 type Status = "connecting" | "live" | "offline";
-interface Badges { notifications: number; messages: number }
+interface Badges { notifications: number; messages: number; /** Unclaimed chats matching the saved filter (staff). */ chatQueue?: number }
 interface RealtimeCtx { socket: Socket | null; status: Status; badges: Badges; refreshBadges: () => void }
 
 const Ctx = createContext<RealtimeCtx>({ socket: null, status: "offline", badges: { notifications: 0, messages: 0 }, refreshBadges: () => {} });
@@ -57,6 +57,7 @@ export function RealtimeProvider({ initialBadges, children }: { initialBadges: B
       }
     });
     s.on("notify:read", refreshBadges);
+    for (const e of ["chat:new", "chat:claimed", "chat:updated"]) s.on(e, refreshBadges);
     return () => { s.removeAllListeners(); s.disconnect(); };
   }, [push, refreshBadges]);
 

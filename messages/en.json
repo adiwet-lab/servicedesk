@@ -88,7 +88,8 @@
     "auditLogs": "Audit Logs",
     "accessReview": "Access Review",
     "systemSettings": "System Settings",
-    "chat": "Chat with IT"
+    "chat": "Chat with IT",
+    "chatQueueBadge": "Unclaimed chats"
   },
   "navSection": {
     "dashboardsReports": "Dashboards & Reports",
@@ -2396,5 +2397,34 @@
     "useForm": "Prefer a form? Fill in the ticket form",
     "back": "Back",
     "notFound": "This conversation is not available."
+  },
+  "chatConsole": {
+    "view": {
+      "unclaimed": "Unclaimed",
+      "mine": "Mine",
+      "myTeams": "My teams",
+      "all": "All"
+    },
+    "search": "Number, subject or requester",
+    "filter": "Filter",
+    "filterCount": "Filter ({n})",
+    "categories": "Categories",
+    "statuses": "Statuses",
+    "teams": "Teams",
+    "branches": "Branches",
+    "openOnly": "Hide closed conversations",
+    "includeForm": "Include tickets created with the form",
+    "saveDefault": "Save as my default",
+    "savedDefault": "Saved — the chat console opens with this filter.",
+    "useDefault": "My default",
+    "clear": "Clear",
+    "empty": "No conversations match.",
+    "unclaimed": "New",
+    "waiting": "waiting {time}",
+    "claim": "Claim chat",
+    "claimAs": "Claim for team…",
+    "unclaimedHint": "Waiting for an internal agent to claim this chat.",
+    "pickConversation": "Select a conversation",
+    "pickConversationHint": "New chats appear in “Unclaimed”. Claim one to reply; set the status when the conversation ends."
   }
 }

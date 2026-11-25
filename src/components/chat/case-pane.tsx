@@ -34,7 +34,7 @@ export async function CasePane({ actor, ticket, created, backHref, detailHref, s
 
   const notices = (
     <ul className="space-y-3 px-4 pb-3">
-      {created && <Bubble from="bot" testid="bot-created">{header.ownerTeam ? t("created", { number: header.number, team: header.ownerTeam }) : t("createdNoTeam", { number: header.number })}</Bubble>}
+      {created && initial.messages.length <= 1 && <Bubble from="bot" testid="bot-created">{header.ownerTeam ? t("created", { number: header.number, team: header.ownerTeam }) : t("createdNoTeam", { number: header.number })}</Bubble>}
       {isRequester && header.approvalStatus === "PENDING" && <Bubble from="bot">{t("pendingApproval")}</Bubble>}
       {isRequester && kind === "RESOLVED" && (
         <>

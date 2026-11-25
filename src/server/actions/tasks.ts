@@ -4,6 +4,7 @@ import { requireActorOrThrow } from "@/server/auth/get-actor";
 import { addTaskAttachments, assignTask, changeTaskStatus, createTask, removeTaskAttachment, updateTask } from "@/server/services/tasks";
 import { addSupportingTeam, escalateTicket, removeSupportingTeam, updateTicketFields } from "@/server/services/ticket-updates";
 import { runAction, formToObject, filesFromForm, type ActionResult } from "./result";
+import { signalChatUpdated } from "@/server/services/chat-cases";
 
 const done = () => revalidatePath("/", "layout");
 
@@ -71,6 +72,7 @@ export async function updateTicketAction(_prev: ActionResult | null, fd: FormDat
   const r = await runAction(async () => {
     const actor = await requireActorOrThrow();
     await updateTicketFields(actor, String(fd.get("ticketId") ?? ""), formToObject(fd));
+    signalChatUpdated(String(fd.get("ticketId") ?? ""));
   }, "Ticket updated");
   done();
   return r as ActionResult;
@@ -98,6 +100,7 @@ export async function escalateTicketAction(_prev: ActionResult | null, fd: FormD
   const r = await runAction(async () => {
     const actor = await requireActorOrThrow();
     await escalateTicket(actor, String(fd.get("ticketId") ?? ""), formToObject(fd));
+    signalChatUpdated(String(fd.get("ticketId") ?? ""));
   }, "Ticket escalated");
   done();
   return r as ActionResult;
