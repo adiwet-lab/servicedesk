@@ -57,6 +57,11 @@ export function SettingsForm({ s, teams, priorities, statuses }: {
               <option value="">{tsettings("dontChangeStatus")}</option>{statuses.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
             </NativeSelect>
           </Field>
+          <Field label={tsettings("cardLocale")} htmlFor="dl" hint={tsettings("cardLocaleHint")}>
+            <NativeSelect id="dl" name="i18n.defaultLocale" defaultValue={String(s["i18n.defaultLocale"] ?? "th")} data-testid="default-locale">
+              <option value="th">ไทย (Thai)</option><option value="en">English</option>
+            </NativeSelect>
+          </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="tickets.requesterCanSetPriority" defaultChecked={!!s["tickets.requesterCanSetPriority"]} className="accent-primary" /> {tsettings("requestersMayChoosePriority")}</label>
         </CardContent>
       </Card>

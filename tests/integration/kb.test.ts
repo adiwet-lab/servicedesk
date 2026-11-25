@@ -130,10 +130,19 @@ describe("convert from ticket", () => {
     return t;
   }
 
+  it("fills the Thai fields when the agent works in Thai", async () => {
+    const t = await resolvedTicket(`Outlook password loop TH ${uniq()}`);
+    const a = await createArticleFromTicket(await actor("agent"), t.id, "th");
+    const row = await prisma.kbArticle.findUniqueOrThrow({ where: { id: a.id } });
+    expect(row.titleTh).toContain("Outlook password loop TH");
+    expect(row.bodyTh).toContain("## อาการ");
+    expect(row.bodyTh).toContain("Cleared cached credentials");
+  });
+
   it("creates a support-only draft with symptoms + solution, linked to the ticket", async () => {
     const t = await resolvedTicket(`Outlook password loop ${uniq()}`);
     const ana = await actor("agent");
-    const a = await createArticleFromTicket(ana, t.id);
+    const a = await createArticleFromTicket(ana, t.id, "en");
     const row = await prisma.kbArticle.findUniqueOrThrow({ where: { id: a.id }, include: { tickets: true } });
     expect(row).toMatchObject({ status: "DRAFT", visibility: "SUPPORT_ONLY", type: "TROUBLESHOOTING", sourceTicketId: t.id, categoryId: await cat("REQ-SW") });
     expect(row.body).toContain("## Symptoms");

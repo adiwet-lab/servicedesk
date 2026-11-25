@@ -107,6 +107,7 @@ export async function saveSettingsAction(_prev: ActionResult | null, fd: FormDat
       "tickets.defaultPriorityCode": raw["tickets.defaultPriorityCode"],
       "workflow.assignedStatusCode": raw["workflow.assignedStatusCode"],
       "workflow.requesterReplyStatusCode": raw["workflow.requesterReplyStatusCode"] ?? "",
+      "i18n.defaultLocale": raw["i18n.defaultLocale"],
     });
   }, "Settings saved");
   revalidatePath("/admin", "layout");

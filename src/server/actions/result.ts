@@ -1,4 +1,17 @@
 import { AuthorizationError, NotFoundError, RateLimitError, ValidationError } from "@/server/authz/errors";
+import { translateFieldErrors, translateServerText } from "@/i18n/server-text-translate";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
+
+/** Request locale for messages; falls back to the default outside a request (e.g. tests). */
+async function messageLocale(): Promise<Locale> {
+  try {
+    const { getLocale } = await import("next-intl/server");
+    const l = await getLocale();
+    return isLocale(l) ? l : DEFAULT_LOCALE;
+  } catch {
+    return "en";
+  }
+}
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }
@@ -8,14 +21,17 @@ export type ActionResult<T = undefined> =
 export async function runAction<T>(fn: () => Promise<T>, message?: string): Promise<ActionResult<T>> {
   try {
     const data = await fn();
-    return { ok: true, data, message };
+    return { ok: true, data, message: message && translateServerText(message, await messageLocale()) };
   } catch (e) {
-    if (e instanceof ValidationError) return { ok: false, error: e.message, fieldErrors: e.fieldErrors };
-    if (e instanceof AuthorizationError || e instanceof NotFoundError || e instanceof RateLimitError) return { ok: false, error: e.message };
+    if (e instanceof ValidationError) {
+      const l = await messageLocale();
+      return { ok: false, error: translateServerText(e.message, l), fieldErrors: translateFieldErrors(e.fieldErrors, l) };
+    }
+    if (e instanceof AuthorizationError || e instanceof NotFoundError || e instanceof RateLimitError) return { ok: false, error: translateServerText(e.message, await messageLocale()) };
     // Let Next.js redirects / notFound propagate.
     if (e && typeof e === "object" && "digest" in e && typeof (e as { digest: unknown }).digest === "string" && (e as { digest: string }).digest.startsWith("NEXT_")) throw e;
     console.error("[action] unexpected error", e);
-    return { ok: false, error: "Something went wrong. Please try again or contact IT." };
+    return { ok: false, error: translateServerText("Something went wrong. Please try again or contact IT.", await messageLocale()) };
   }
 }
 

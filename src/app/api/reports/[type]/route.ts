@@ -6,6 +6,7 @@ import { parseAnalyticsFilters } from "@/server/services/analytics";
 import { runReport } from "@/server/services/reports";
 import { audit } from "@/server/services/audit";
 import { toCsv } from "@/server/domain/analytics";
+import { currentLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ type: st
   if (!actor) return new Response("Unauthorized", { status: 401 });
   const { type } = await params;
   const url = new URL(req.url);
-  const filters = parseAnalyticsFilters(Object.fromEntries(url.searchParams.entries()));
+  const filters = parseAnalyticsFilters(Object.fromEntries(url.searchParams.entries()), await currentLocale());
   try {
     await enforceRateLimit(`report:${actor.id}`, 10, 60_000);
     const r = await runReport(actor, type, filters);

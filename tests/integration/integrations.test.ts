@@ -78,7 +78,9 @@ describe("Microsoft Teams channel cards", () => {
       await processOutbox();
       const req = mock.requests.find((q) => q.body.includes(t.number))!;
       expect(req.body).not.toContain("CONFIDENTIAL-SUBJECT");
-      expect(req.body).toContain("confidential");
+      // Channel cards use the system default language (Thai unless changed in System Settings).
+      expect(req.body).toContain("ข้อมูลลับ");
+      expect(req.body).toContain("ทีม");
     } finally { await mock.close(); }
   });
 
