@@ -4,6 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import { badgeCountsAction } from "@/server/actions/messages";
 import { useToast } from "./toaster";
+import { useTranslations } from "next-intl";
+import { renderNotification } from "@/i18n/notifications";
 
 type Status = "connecting" | "live" | "offline";
 interface Badges { notifications: number; messages: number }
@@ -23,6 +25,9 @@ export function RealtimeProvider({ initialBadges, children }: { initialBadges: B
   const { push } = useToast();
   const pathname = usePathname();
   const pathRef = useRef(pathname);
+  const tn = useTranslations("notify");
+  const tnRef = useRef(tn);
+  tnRef.current = tn;
   pathRef.current = pathname;
 
   const refreshBadges = useCallback(() => {
@@ -42,11 +47,14 @@ export function RealtimeProvider({ initialBadges, children }: { initialBadges: B
       if (err.message === "unauthorized") s.disconnect();
     });
     s.on("session:revoked", () => { window.location.href = "/login?error=session_revoked"; });
-    s.on("notify", (p: { type: string; title: string; link: string | null; ticketId: string | null }) => {
+    s.on("notify", (p: { type: string; title: string; key?: string | null; params?: Record<string, string | number> | null; link: string | null; ticketId: string | null }) => {
       refreshBadges();
       // Don't toast chat messages for the conversation currently open.
       const onTicket = p.link && pathRef.current && p.link.split("?")[0]!.endsWith(pathRef.current.split("/").pop() ?? "#");
-      if (!(p.type === "NEW_MESSAGE" && onTicket)) push({ title: p.title, href: p.link });
+      if (!(p.type === "NEW_MESSAGE" && onTicket)) {
+        const r = renderNotification({ key: p.key ?? null, params: p.params ?? null, title: p.title, body: null }, tnRef.current as never);
+        push({ title: r.title, body: r.body, href: p.link });
+      }
     });
     s.on("notify:read", refreshBadges);
     return () => { s.removeAllListeners(); s.disconnect(); };
@@ -96,11 +104,12 @@ export function TicketLiveRefresh({ ticketId }: { ticketId: string }) {
 }
 
 export function LiveIndicator() {
+  const t = useTranslations("realtime");
   const { status } = useRealtimeContext();
   const color = status === "live" ? "bg-success" : status === "connecting" ? "bg-warning" : "bg-muted-foreground";
-  const label = status === "live" ? "Live" : status === "connecting" ? "Connecting…" : "Offline";
+  const label = status === "live" ? t("live") : status === "connecting" ? t("connecting") : t("offline");
   return (
-    <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex" title={`Realtime: ${label}`} data-testid="live-indicator" data-status={status}>
+    <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex" title={t("realtimeStatus", { status: label })} data-testid="live-indicator" data-status={status}>
       <span className={`size-2 rounded-full ${color}`} /> {label}
     </span>
   );

@@ -13,11 +13,13 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Alert, Field } from "@/components/ui/misc";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export function CrudTable({ entity, singular, fields, columns, rows, canToggle, rowLink }: {
   entity: string; singular: string; fields: FieldDef[]; columns: ColumnDef[]; rows: CrudRow[]; canToggle: boolean;
   rowLink?: { label: string; hrefPrefix: string };
 }) {
+  const tcfg = useTranslations("cfg");
   const router = useRouter();
   const [editing, setEditing] = useState<CrudRow | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,25 +56,25 @@ export function CrudTable({ entity, singular, fields, columns, rows, canToggle, 
       <div className="flex flex-wrap items-center gap-2 border-b p-3">
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter…" className="pl-9" aria-label="Filter" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tcfg("filter")} className="pl-9" aria-label={tcfg("filter_")} />
         </div>
         {canToggle && (
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="accent-primary" /> Show inactive
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="accent-primary" /> {tcfg("showInactive")}
           </label>
         )}
-        <Button onClick={() => setEditing("new")} data-testid="crud-add"><Plus /> Add {singular.toLowerCase()}</Button>
+        <Button onClick={() => setEditing("new")} data-testid="crud-add"><Plus /> {tcfg("addThing", { thing: singular.toLowerCase() })}</Button>
       </div>
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {columns.map((c) => <TableHead key={c.key}>{c.label}</TableHead>)}
-            {canToggle && <TableHead>Status</TableHead>}
-            <TableHead className="text-right">Actions</TableHead>
+            {canToggle && <TableHead>{tcfg("status")}</TableHead>}
+            <TableHead className="text-right">{tcfg("actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 && <TableRow><TableCell colSpan={columns.length + 2} className="py-10 text-center text-muted-foreground">No records.</TableCell></TableRow>}
+          {filtered.length === 0 && <TableRow><TableCell colSpan={columns.length + 2} className="py-10 text-center text-muted-foreground">{tcfg("noRecords")}</TableCell></TableRow>}
           {filtered.map((r) => (
             <TableRow key={r.id} className={cn(!r.isActive && "opacity-60")}>
               {columns.map((c) => {
@@ -80,19 +82,19 @@ export function CrudTable({ entity, singular, fields, columns, rows, canToggle, 
                 return (
                   <TableCell key={c.key} className={cn(c.kind === "mono" && "font-mono text-xs")}>
                     {c.kind === "color" ? <ColorBadge color={String(v)}>{String(v)}</ColorBadge>
-                      : c.kind === "bool" ? (v ? <Badge variant="success">Yes</Badge> : <span className="text-muted-foreground">No</span>)
+                      : c.kind === "bool" ? (v ? <Badge variant="success">{tcfg("yes")}</Badge> : <span className="text-muted-foreground">{tcfg("no")}</span>)
                       : c.kind === "badge" ? <Badge variant="secondary">{String(v)}</Badge>
                       : String(v ?? "—")}
                   </TableCell>
                 );
               })}
-              {canToggle && <TableCell>{r.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>}
+              {canToggle && <TableCell>{r.isActive ? <Badge variant="success">{tcfg("active")}</Badge> : <Badge variant="outline">{tcfg("inactive")}</Badge>}</TableCell>}
               <TableCell className="text-right whitespace-nowrap">
                 {rowLink && <Button asChild variant="ghost" size="sm"><Link href={`${rowLink.hrefPrefix}${r.id}`}>{rowLink.label}</Link></Button>}
-                <Button variant="ghost" size="sm" onClick={() => setEditing(r)} aria-label="Edit"><Pencil /> Edit</Button>
+                <Button variant="ghost" size="sm" onClick={() => setEditing(r)} aria-label={tcfg("edit")}><Pencil /> {tcfg("edit")}</Button>
                 {canToggle && (
-                  <Button variant="ghost" size="sm" onClick={() => toggle(r)} disabled={pending} aria-label={r.isActive ? "Deactivate" : "Activate"}>
-                    <Power className={r.isActive ? "text-destructive" : "text-success"} /> {r.isActive ? "Disable" : "Enable"}
+                  <Button variant="ghost" size="sm" onClick={() => toggle(r)} disabled={pending} aria-label={r.isActive ? tcfg("deactivate") : tcfg("activate")}>
+                    <Power className={r.isActive ? "text-destructive" : "text-success"} /> {r.isActive ? tcfg("disable") : tcfg("enable")}
                   </Button>
                 )}
               </TableCell>
@@ -104,8 +106,8 @@ export function CrudTable({ entity, singular, fields, columns, rows, canToggle, 
       <Dialog open={!!editing} onOpenChange={(o) => !o && close()}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{isNew ? `Add ${singular.toLowerCase()}` : `Edit ${singular.toLowerCase()}`}</DialogTitle>
-            <DialogDescription>Changes are recorded in the audit log.</DialogDescription>
+            <DialogTitle>{isNew ? tcfg("addThing", { thing: singular.toLowerCase() }) : tcfg("editThing", { thing: singular.toLowerCase() })}</DialogTitle>
+            <DialogDescription>{tcfg("changesAreRecordedInTheAudit")}</DialogDescription>
           </DialogHeader>
           <form action={submit} className="grid gap-4" key={isNew ? "new" : (editing as CrudRow | null)?.id}>
             {error && <Alert variant="destructive">{error}</Alert>}
@@ -133,7 +135,7 @@ export function CrudTable({ entity, singular, fields, columns, rows, canToggle, 
                         ))}
                       </div>
                     ) : f.type === "checkbox" ? (
-                      <label className="flex items-center gap-2 text-sm"><input id={id} type="checkbox" name={f.name} defaultChecked={!!v} disabled={disabled} className="size-4 accent-primary" /> Enabled</label>
+                      <label className="flex items-center gap-2 text-sm"><input id={id} type="checkbox" name={f.name} defaultChecked={!!v} disabled={disabled} className="size-4 accent-primary" /> {tcfg("enabled")}</label>
                     ) : f.type === "color" ? (
                       <div className="flex items-center gap-2"><input type="color" name={f.name} defaultValue={String(v ?? "#3b82f6")} className="h-9 w-14 rounded border" id={id} /></div>
                     ) : (
@@ -144,8 +146,8 @@ export function CrudTable({ entity, singular, fields, columns, rows, canToggle, 
               );
             })}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={close}>Cancel</Button>
-              <Button type="submit" disabled={pending} data-testid="crud-save">{pending ? "Saving…" : "Save"}</Button>
+              <Button type="button" variant="outline" onClick={close}>{tcfg("cancel")}</Button>
+              <Button type="submit" disabled={pending} data-testid="crud-save">{pending ? tcfg("saving") : tcfg("save")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

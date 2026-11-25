@@ -7,14 +7,18 @@ import { Button } from "@/components/ui/button";
 import { ColorBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { InboxLiveRefresh } from "./inbox-live";
+import { getTranslations } from "next-intl/server";
+import { getFormat } from "@/i18n/server";
 
 /** Conversation list (Support Chat for staff, Messages for requesters). */
 export async function ChatInbox({ actor, base, ticketBase, title, description, params, mineOnly = false }: {
   actor: Actor; base: string; ticketBase: string; title: string; description: string;
   params: Record<string, string | undefined>; mineOnly?: boolean;
 }) {
+  const tchat = await getTranslations("chat");
+  const fmt = await getFormat();
   const unreadOnly = params.unread === "1";
   const res = await chatInbox(actor, { q: params.q, unreadOnly, page: Number(params.page ?? 1), mineOnly });
   const qs = (patch: Record<string, string | undefined>) => {
@@ -32,17 +36,17 @@ export async function ChatInbox({ actor, base, ticketBase, title, description, p
             {unreadOnly && <input type="hidden" name="unread" value="1" />}
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input name="q" defaultValue={params.q} placeholder="Search messages, ticket number or subject…" className="pl-9" aria-label="Search conversations" data-testid="inbox-search" />
+              <Input name="q" defaultValue={params.q} placeholder={tchat("searchMessagesTicketNumberOrSubject")} className="pl-9" aria-label={tchat("searchConversations")} data-testid="inbox-search" />
             </div>
-            <Button type="submit" variant="secondary">Search</Button>
+            <Button type="submit" variant="secondary">{tchat("search")}</Button>
           </form>
           <div className="flex rounded-md border p-0.5 text-sm">
-            <Link href={qs({ unread: undefined, page: undefined })} className={cn("rounded px-3 py-1", !unreadOnly && "bg-muted font-medium")}>All</Link>
-            <Link href={qs({ unread: "1", page: undefined })} className={cn("rounded px-3 py-1", unreadOnly && "bg-muted font-medium")}>Unread {res.totalUnread > 0 && `(${res.totalUnread})`}</Link>
+            <Link href={qs({ unread: undefined, page: undefined })} className={cn("rounded px-3 py-1", !unreadOnly && "bg-muted font-medium")}>{tchat("all")}</Link>
+            <Link href={qs({ unread: "1", page: undefined })} className={cn("rounded px-3 py-1", unreadOnly && "bg-muted font-medium")}>{tchat("unreadCount")} {res.totalUnread > 0 && `(${res.totalUnread})`}</Link>
           </div>
         </div>
         {res.rows.length === 0 ? (
-          <EmptyState icon={<MessagesSquare />} title={params.q ? "No conversations match your search" : unreadOnly ? "No unread messages" : "No conversations yet"} />
+          <EmptyState icon={<MessagesSquare />} title={params.q ? tchat("noConversationsMatchYourSearch") : unreadOnly ? tchat("noUnreadMessages") : tchat("noConversationsYet")} />
         ) : (
           <ul className="divide-y" data-testid="inbox-list">
             {res.rows.map((r) => (
@@ -58,10 +62,10 @@ export async function ChatInbox({ actor, base, ticketBase, title, description, p
                       {r.lastType === "INTERNAL" && <Lock className="mr-1 inline size-3 text-amber-600" />}
                       <span className="font-medium text-foreground/80">{r.lastSender}:</span> {r.preview}
                     </p>
-                    <p className="text-xs text-muted-foreground">Requester: {r.requester}</p>
+                    <p className="text-xs text-muted-foreground">{tchat("requesterName", { name: r.requester })}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-xs text-muted-foreground">{formatDateTime(r.lastAt)}</span>
+                    <span className="text-xs text-muted-foreground">{fmt.dateTime(r.lastAt)}</span>
                     {r.unread > 0 && <span className="rounded-full bg-destructive px-2 text-xs font-semibold text-white" data-testid="inbox-unread">{r.unread}</span>}
                   </div>
                 </Link>
@@ -70,10 +74,10 @@ export async function ChatInbox({ actor, base, ticketBase, title, description, p
           </ul>
         )}
         <div className="flex items-center justify-between border-t px-3 py-3 text-sm text-muted-foreground">
-          <span>{res.total} conversation{res.total === 1 ? "" : "s"} · page {res.page} of {res.pages}</span>
+          <span>{tchat("pager", { n: res.total, page: res.page, pages: res.pages })}</span>
           <div className="flex gap-1">
-            {res.page > 1 && <Link className="rounded-md border p-1.5 hover:bg-accent" href={qs({ page: String(res.page - 1) })} aria-label="Previous page"><ChevronLeft className="size-4" /></Link>}
-            {res.page < res.pages && <Link className="rounded-md border p-1.5 hover:bg-accent" href={qs({ page: String(res.page + 1) })} aria-label="Next page"><ChevronRight className="size-4" /></Link>}
+            {res.page > 1 && <Link className="rounded-md border p-1.5 hover:bg-accent" href={qs({ page: String(res.page - 1) })} aria-label={tchat("previousPage")}><ChevronLeft className="size-4" /></Link>}
+            {res.page < res.pages && <Link className="rounded-md border p-1.5 hover:bg-accent" href={qs({ page: String(res.page + 1) })} aria-label={tchat("nextPage")}><ChevronRight className="size-4" /></Link>}
           </div>
         </div>
       </Card>

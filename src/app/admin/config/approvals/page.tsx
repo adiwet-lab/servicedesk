@@ -12,47 +12,53 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
-export const metadata = { title: "Approval Policies" };
+export const generateMetadata = pageTitle("approvalPolicies");
 
 export default async function ApprovalPoliciesPage() {
+  const locale = await currentLocale();
+  const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_WORKFLOW)) notFound();
   const [policies, categories, users] = await Promise.all([
     listPolicies(actor),
     prisma.category.findMany({ where: { parentId: null, deletedAt: null }, orderBy: { sortOrder: "asc" },
-      select: { id: true, name: true, children: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } } } }),
+      select: { id: true, name: true, nameTh: true, children: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, nameTh: true } } } }),
     prisma.user.findMany({ where: { status: "ACTIVE", deletedAt: null, tenant: { type: { not: "VENDOR" } } }, orderBy: { displayName: "asc" }, select: { id: true, displayName: true } }),
   ]);
   const userOpts = users.map((u) => ({ id: u.id, name: u.displayName }));
   return (
     <div className="space-y-5">
-      <PageHeader title="Approval Policies" description="Require approval before IT starts work on certain request types. The SLA is paused while approval is pending."
-        actions={<PolicyDialog categories={categories} users={userOpts} trigger={<Button data-testid="new-policy"><Plus /> New policy</Button>} />} />
+      <PageHeader title={tcfg("approvalPolicies")} description={tcfg("requireApprovalBeforeItStartsWork")}
+        actions={<PolicyDialog categories={categories} users={userOpts} trigger={<Button data-testid="new-policy"><Plus /> {tcfg("newPolicy")}</Button>} />} />
       <Card>
         <CardContent className="pt-2">
-          {policies.length === 0 ? <EmptyState title="No approval policies" /> : (
+          {policies.length === 0 ? <EmptyState title={tcfg("noApprovalPolicies")} /> : (
             <Table className="text-sm">
-              <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Policy</TableHead><TableHead>Category</TableHead><TableHead>Steps</TableHead><TableHead className="text-right">Tickets</TableHead><TableHead /></TableRow></TableHeader>
+              <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{tcfg("policy")}</TableHead><TableHead>{tcfg("category")}</TableHead><TableHead>{tcfg("steps")}</TableHead><TableHead className="text-right">{tcfg("tickets")}</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
                 {policies.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.name} {!p.isActive && <Badge variant="secondary">Inactive</Badge>}</TableCell>
-                    <TableCell>{p.category.parent ? `${p.category.parent.name} › ` : ""}{p.category.name}</TableCell>
+                    <TableCell className="font-medium">{p.name} {!p.isActive && <Badge variant="secondary">{tcfg("inactive")}</Badge>}</TableCell>
+                    <TableCell>{p.category.parent ? `${ln(p.category.parent, locale)} › ` : ""}{ln(p.category, locale)}</TableCell>
                     <TableCell>
                       <ol className="list-decimal pl-4">
-                        {p.steps.map((s) => <li key={s.id}>{s.name}: {s.approverType === "REQUESTER_MANAGER" ? "requester's manager" : s.approverUser?.displayName}{s.fallbackUser ? ` (fallback ${s.fallbackUser.displayName})` : ""}</li>)}
+                        {p.steps.map((s) => <li key={s.id}>{s.name}: {s.approverType === "REQUESTER_MANAGER" ? tcfg("requesterSManager") : s.approverUser?.displayName}{s.fallbackUser ? tcfg("fallbackUser", { name: s.fallbackUser.displayName }) : ""}</li>)}
                       </ol>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{p._count.tickets}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <PolicyDialog categories={categories} users={userOpts}
-                          policy={{ id: p.id, name: p.name, categoryId: p.categoryId, isActive: p.isActive, steps: p.steps.map((s) => ({ name: s.name, approverType: s.approverType, approverUserId: s.approverUserId, fallbackUserId: s.fallbackUserId })) }}
-                          trigger={<Button size="icon" variant="ghost" aria-label={`Edit ${p.name}`}><Pencil /></Button>} />
+                          policy={{ id: p.id, name: p.name, categoryId: p.categoryId, isActive: p.isActive, steps: p.steps.map((s) => ({ name: s.name, nameTh: s.nameTh, approverType: s.approverType, approverUserId: s.approverUserId, fallbackUserId: s.fallbackUserId })) }}
+                          trigger={<Button size="icon" variant="ghost" aria-label={tcfg("editNamed", { name: p.name })}><Pencil /></Button>} />
                         {p._count.tickets === 0 && (
                           <form action={deletePolicyAction}><input type="hidden" name="policyId" value={p.id} />
-                            <Button size="icon" variant="ghost" type="submit" aria-label={`Delete ${p.name}`}><Trash2 className="text-destructive" /></Button></form>
+                            <Button size="icon" variant="ghost" type="submit" aria-label={tcfg("deleteNamed", { name: p.name })}><Trash2 className="text-destructive" /></Button></form>
                         )}
                       </div>
                     </TableCell>

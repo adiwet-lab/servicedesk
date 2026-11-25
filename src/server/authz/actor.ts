@@ -19,6 +19,8 @@ export interface Actor {
   teamIds: string[];
   /** Teams the user leads. */
   leadTeamIds: string[];
+  /** Preferred UI language ("th" | "en"); null = organisation default. */
+  locale?: string | null;
   /** Request metadata used for auditing. */
   ip?: string | null;
   userAgent?: string | null;

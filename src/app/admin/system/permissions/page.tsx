@@ -7,10 +7,13 @@ import { PERMISSIONS as P, VENDOR_FORBIDDEN_PERMISSIONS } from "@/server/authz/p
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, PageHeader } from "@/components/ui/misc";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = { title: "Permissions" };
+export const generateMetadata = pageTitle("permissions");
 
 export default async function PermissionsPage() {
+  const tsys = await getTranslations("sysadm");
   const actor = await requireAdminPortal();
   if (!canAny(actor, [P.ADMIN_ROLES, P.ADMIN_USERS])) notFound();
   const [perms, roles] = await Promise.all([
@@ -19,13 +22,13 @@ export default async function PermissionsPage() {
   ]);
   return (
     <div>
-      <PageHeader title="Permission Matrix" description="Live role × permission matrix from the database." />
-      <Alert className="mb-4">Permissions marked <strong>✱</strong> are never granted to users from external (vendor) tenants, regardless of role configuration.</Alert>
+      <PageHeader title={tsys("permissionMatrix")} description={tsys("liveRolePermissionMatrixFromThe")} />
+      <Alert className="mb-4">{tsys.rich("vendorPermNote", { b: (c) => <strong>{c}</strong> })}</Alert>
       <Card className="overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Permission</TableHead>
+              <TableHead>{tsys("permission")}</TableHead>
               {roles.map((r) => <TableHead key={r.id} className="text-center">{r.name}</TableHead>)}
             </TableRow>
           </TableHeader>

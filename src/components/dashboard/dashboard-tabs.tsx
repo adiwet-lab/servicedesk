@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type { Actor } from "@/server/authz/actor";
 import { can, canAny } from "@/server/authz/guards";
 import { PERMISSIONS as P } from "@/server/authz/permissions";
@@ -26,13 +27,14 @@ export function defaultDashboard(actor: Actor): string {
 }
 
 export function DashboardTabs({ actor, current, query }: { actor: Actor; current: DashboardKey; query?: string }) {
+  const td = useTranslations("dash");
   return (
-    <nav className="mb-4 flex flex-wrap gap-1 border-b" aria-label="Dashboards" data-testid="dashboard-tabs">
+    <nav className="mb-4 flex flex-wrap gap-1 border-b" aria-label={td("dashboards")} data-testid="dashboard-tabs">
       {dashboardsFor(actor).map((d) => (
         <Link key={d.key} href={`${d.href}${query ? `?${query}` : ""}`}
           className={cn("-mb-px border-b-2 px-3 py-2 text-sm", d.key === current ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}
           aria-current={d.key === current ? "page" : undefined}>
-          {d.label}
+          {td(`tab.${d.key}`)}
         </Link>
       ))}
     </nav>

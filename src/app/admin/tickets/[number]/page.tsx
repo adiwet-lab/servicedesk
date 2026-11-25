@@ -1,7 +1,8 @@
 import { requireAdminPortal } from "@/server/auth/get-actor";
 import { TicketDetail } from "@/components/tickets/ticket-detail";
+import { pageTitle } from "@/i18n/metadata";
 
-export const metadata = { title: "Ticket" };
+export const generateMetadata = pageTitle("ticket");
 
 export default async function AdminTicketPage({ params, searchParams }: { params: Promise<{ number: string }>; searchParams: Promise<{ task?: string; tab?: string }> }) {
   const actor = await requireAdminPortal();

@@ -1,4 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { translateServerText } from "@/i18n/server-text-translate";
+import type { Locale } from "@/i18n/config";
 import { prisma } from "@/server/db";
 import type { Actor } from "@/server/authz/actor";
 import { isVendor } from "@/server/authz/actor";
@@ -60,16 +62,17 @@ export async function getAccessReview(actor: Actor, opts: { expiringDays?: numbe
   };
 }
 
-export async function exportAccessReviewCsv(actor: Actor) {
+export async function exportAccessReviewCsv(actor: Actor, locale: Locale = "en") {
   const r = await getAccessReview(actor);
+  const tr = (x: string) => translateServerText(x, locale);
   const d = (x: Date | null) => (x ? x.toISOString() : "");
   const rows: unknown[][] = [];
   for (const [section, list] of [["Expiring", r.expiring], ["Expired but active", r.expired], ["Inactive", r.inactive], ["Privileged", r.privileged]] as const) {
-    for (const u of list) rows.push([section, u.name, u.email, u.tenant, u.tenantType, u.roles.join("; "), u.privileges.join("; "), d(u.lastLoginAt), d(u.accessExpiresAt)]);
+    for (const u of list) rows.push([tr(section), u.name, u.email, u.tenant, u.tenantType, u.roles.join("; "), u.privileges.join("; "), d(u.lastLoginAt), d(u.accessExpiresAt)]);
   }
-  for (const t of r.tokens) rows.push(["API token", t.name, `${t.prefix}…`, "", "", "bi.read", t.includeNames ? "includes names" : "pseudonymous", d(t.lastUsedAt), d(t.expiresAt)]);
+  for (const t of r.tokens) rows.push([tr("API token"), t.name, `${t.prefix}…`, "", "", "bi.read", tr(t.includeNames ? "includes names" : "pseudonymous"), d(t.lastUsedAt), d(t.expiresAt)]);
   await audit(prisma, actor, { action: "ACCESS_REVIEW_EXPORTED", entityType: "AccessReview", entityId: "access-review", newValue: { rows: rows.length } });
-  return toCsv(["Section", "Name", "Email / token", "Tenant", "Tenant type", "Roles", "Privileges", "Last login / used", "Access expires"], rows);
+  return toCsv(["Section", "Name", "Email / token", "Tenant", "Tenant type", "Roles", "Privileges", "Last login / used", "Access expires"].map(tr), rows);
 }
 
 // ───────────────────────────── Expiry notices (job) ─────────────────────────────
@@ -100,8 +103,8 @@ export async function runExpiryNotices(db: PrismaClient = prisma, now = new Date
         const claimed = await tx.user.updateMany({ where: { id: u.id, expiryNotifiedAt: u.expiryNotifiedAt }, data: { expiryNotifiedAt: now } });
         if (claimed.count !== 1) return;
         const when = u.accessExpiresAt!.toISOString().slice(0, 10);
-        await notifyUsers(tx, admins.filter((id) => id !== u.id), { type: "ACCESS_EXPIRING", title: `Access expires ${when}: ${u.displayName}`, body: `${u.tenant.name} — extend or let it lapse.`, link: `/admin/system/users/${u.id}` });
-        await notifyUsers(tx, [u.id], { type: "ACCESS_EXPIRING", title: `Your access expires on ${when}`, body: "Contact your IT administrator if you still need access." });
+        await notifyUsers(tx, admins.filter((id) => id !== u.id), { type: "ACCESS_EXPIRING", key: "accessExpiringAdmin", params: { date: when, name: u.displayName, tenant: u.tenant.name }, title: `Access expires ${when}: ${u.displayName}`, body: `${u.tenant.name} — extend or let it lapse.`, link: `/admin/system/users/${u.id}` });
+        await notifyUsers(tx, [u.id], { type: "ACCESS_EXPIRING", key: "accessExpiringSelf", params: { date: when }, title: `Your access expires on ${when}`, body: "Contact your IT administrator if you still need access." });
         await audit(tx, null, { action: "ACCESS_EXPIRY_NOTICE", entityType: "User", entityId: u.id, newValue: { accessExpiresAt: u.accessExpiresAt } });
         notified++;
       });

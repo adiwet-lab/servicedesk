@@ -8,10 +8,16 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
-export const metadata = { title: "Support Agents" };
+export const generateMetadata = pageTitle("supportAgents");
 
 export default async function AgentsPage() {
+  const locale = await currentLocale();
+  const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_TEAMS)) notFound();
   const agents = await prisma.user.findMany({
@@ -25,19 +31,19 @@ export default async function AgentsPage() {
   const wl = new Map(workload.map((w) => [w.assignedAgentId, w._count._all]));
   return (
     <div>
-      <PageHeader title="Support Agents" description="Users who belong to at least one support team. Manage membership from Support Teams." />
+      <PageHeader title={tcfg("supportAgents")} description={tcfg("usersWhoBelongToAtLeast")} />
       <Card className="overflow-hidden">
         <Table>
-          <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Agent</TableHead><TableHead>Organization</TableHead><TableHead>Teams</TableHead><TableHead>Roles</TableHead><TableHead>Open tickets</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{tcfg("agent")}</TableHead><TableHead>{tcfg("organization")}</TableHead><TableHead>{tcfg("teams")}</TableHead><TableHead>{tcfg("roles")}</TableHead><TableHead>{tcfg("openTickets")}</TableHead><TableHead>{tcfg("status")}</TableHead></TableRow></TableHeader>
           <TableBody>
             {agents.map((a) => (
               <TableRow key={a.id}>
                 <TableCell><Link href={`/admin/system/users/${a.id}`} className="font-medium hover:underline">{a.displayName}</Link><p className="text-xs text-muted-foreground">{a.email}</p></TableCell>
-                <TableCell className="text-sm">{a.tenant.name}{a.tenant.type === "VENDOR" && <Badge variant="warning" className="ml-1">External</Badge>}</TableCell>
-                <TableCell className="space-x-1">{a.teamMemberships.map((m) => <Badge key={m.teamId} variant="secondary">{m.team.name}{m.role === "LEAD" ? " ★" : ""}</Badge>)}</TableCell>
+                <TableCell className="text-sm">{a.tenant.name}{a.tenant.type === "VENDOR" && <Badge variant="warning" className="ml-1">{tcfg("external")}</Badge>}</TableCell>
+                <TableCell className="space-x-1">{a.teamMemberships.map((m) => <Badge key={m.teamId} variant="secondary">{ln(m.team, locale)}{m.role === "LEAD" ? " ★" : ""}</Badge>)}</TableCell>
                 <TableCell className="text-sm">{a.roles.map((r) => r.role.name).join(", ")}</TableCell>
                 <TableCell className="tabular-nums">{wl.get(a.id) ?? 0}</TableCell>
-                <TableCell>{a.status === "ACTIVE" ? <Badge variant="success">Active</Badge> : <Badge variant="destructive">{a.status}</Badge>}</TableCell>
+                <TableCell>{a.status === "ACTIVE" ? <Badge variant="success">{tcfg("active")}</Badge> : <Badge variant="destructive">{a.status}</Badge>}</TableCell>
               </TableRow>
             ))}
           </TableBody>

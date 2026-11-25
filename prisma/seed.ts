@@ -305,11 +305,50 @@ async function main() {
 
   await seedKnowledgeBase();
   await seedApprovalPolicies();
+  await seedThaiNames();
 
   console.log("✅ Seed complete.");
 }
 
 /** Manager approval for hardware, access and new-equipment requests (created only if missing). */
+/** Thai display names for the seeded configuration data. Only fills empty nameTh, so admin edits are kept. */
+const THAI_NAMES = {
+  category: {
+    HW: "ฮาร์ดแวร์", "HW-DT": "คอมพิวเตอร์ตั้งโต๊ะ", "HW-MB": "อุปกรณ์มือถือ", "HW-MN": "จอภาพ", "HW-NB": "โน้ตบุ๊ก", "HW-PE": "อุปกรณ์ต่อพ่วง", "HW-PR": "เครื่องพิมพ์",
+    M365: "Microsoft 365", "M365-ACC": "บัญชีผู้ใช้", "M365-MAIL": "อีเมล", "M365-PERM": "สิทธิ์การเข้าถึง", "M365-TEAMS": "Microsoft Teams",
+    NW: "เครือข่าย", "NW-FW": "ไฟร์วอลล์", "NW-INET": "อินเทอร์เน็ต", "NW-LAN": "แลน (LAN)", "NW-SRV": "เซิร์ฟเวอร์", "NW-VPN": "VPN", "NW-WIFI": "Wi-Fi",
+    REQ: "คำขอด้านไอที", "REQ-ACC": "ขอสิทธิ์การเข้าถึง", "REQ-HW": "ขออุปกรณ์ฮาร์ดแวร์", "REQ-NEW": "ขออุปกรณ์ใหม่", "REQ-SW": "ติดตั้งซอฟต์แวร์",
+    RTL: "ระบบหน้าร้าน", "RTL-BAR": "เครื่องสแกนบาร์โค้ด", "RTL-CCTV": "กล้องวงจรปิด", "RTL-PAY": "เครื่องรับชำระเงิน", "RTL-POS": "POS",
+    SYS: "ระบบงาน", "SYS-ACC": "ระบบบัญชี", "SYS-EC": "อีคอมเมิร์ซ", "SYS-ERP": "ERP", "SYS-HR": "ระบบบุคคล", "SYS-POS": "POS",
+  },
+  priority: { P1: "วิกฤต", P2: "สูง", P3: "ปานกลาง", P4: "ต่ำ" },
+  ticketStatus: {
+    NEW: "ใหม่", ASSIGNED: "มอบหมายแล้ว", IN_PROGRESS: "กำลังดำเนินการ", ON_HOLD: "พักไว้", WAITING_USER: "รอผู้แจ้ง",
+    WAITING_THIRD_PARTY: "รอบุคคลภายนอก", RESOLVED: "แก้ไขแล้ว", CLOSED: "ปิดแล้ว", CANCELLED: "ยกเลิก",
+  },
+  supportTeam: {
+    "IT-SUPPORT": "ไอทีซัพพอร์ต", INFRA: "โครงสร้างพื้นฐาน", ERP: "ทีม ERP", M365: "ทีม Microsoft 365", RETAIL: "ระบบหน้าร้าน",
+    "VENDOR-A": "Vendor A – ผู้ดูแลเครือข่าย", "VENDOR-B": "Vendor B – เครื่องรับชำระเงิน",
+  },
+  department: { IT: "เทคโนโลยีสารสนเทศ", FIN: "การเงิน", OPS: "ปฏิบัติการสาขา", MGMT: "ผู้บริหาร", HR: "ทรัพยากรบุคคล" },
+  branch: { HQ: "สำนักงานใหญ่", BKK01: "กรุงเทพฯ – สาขาสยาม", CNX01: "สาขาเชียงใหม่", FHQ: "สำนักงานใหญ่ Fabrikam" },
+  location: { "BKK01-BO": "หลังร้าน", "BKK01-SF": "พื้นที่ขาย", "CNX01-SF": "พื้นที่ขาย", "FHQ-F1": "ชั้น 1", "HQ-F5": "ชั้น 5", "HQ-F6": "ชั้น 6" },
+} as const;
+
+async function seedThaiNames() {
+  console.log("Seeding Thai names…");
+  const models = {
+    category: prisma.category, priority: prisma.priority, ticketStatus: prisma.ticketStatus, supportTeam: prisma.supportTeam,
+    department: prisma.department, branch: prisma.branch, location: prisma.location,
+  } as unknown as Record<keyof typeof THAI_NAMES, { updateMany(a: { where: object; data: object }): Promise<unknown> }>;
+  for (const [model, names] of Object.entries(THAI_NAMES) as [keyof typeof THAI_NAMES, Record<string, string>][]) {
+    for (const [code, nameTh] of Object.entries(names)) {
+      await models[model].updateMany({ where: { code, nameTh: null }, data: { nameTh } });
+    }
+  }
+  await prisma.approvalStep.updateMany({ where: { name: "Line manager approval", nameTh: null }, data: { nameTh: "อนุมัติโดยผู้บังคับบัญชาสายตรง" } });
+}
+
 async function seedApprovalPolicies() {
   console.log("Seeding approval policies…");
   const fallback = await prisma.user.findFirst({ where: { email: "sys.admin@contoso.example" } });
@@ -329,41 +368,59 @@ async function seedKnowledgeBase() {
   const author = await prisma.user.findFirst({ where: { email: "sys.admin@contoso.example" } });
   if (!author) return;
   const cat = async (code: string) => (await prisma.category.findUnique({ where: { code } }))?.id ?? null;
-  const articles: { title: string; summary: string; body: string; type: "FAQ" | "TROUBLESHOOTING" | "HOW_TO"; visibility: "EMPLOYEES" | "SUPPORT_ONLY"; status: "DRAFT" | "PUBLISHED"; category: string; tags: string[] }[] = [
+  const articles: { title: string; summary: string; body: string; titleTh: string; summaryTh: string; bodyTh: string; oldTitle?: string; type: "FAQ" | "TROUBLESHOOTING" | "HOW_TO"; visibility: "EMPLOYEES" | "SUPPORT_ONLY"; status: "DRAFT" | "PUBLISHED"; category: string; tags: string[] }[] = [
     {
       title: "How to connect to the company VPN", summary: "Install the VPN client and sign in with your Microsoft account to work from outside the office.",
+      titleTh: "วิธีเชื่อมต่อ VPN ของบริษัท", summaryTh: "ติดตั้งโปรแกรม VPN และลงชื่อเข้าใช้ด้วยบัญชี Microsoft เพื่อทำงานจากนอกสำนักงาน",
+      bodyTh: "## ก่อนเริ่ม\n\n- ต้องใช้โน้ตบุ๊กของบริษัท\n- ต้องมีการเชื่อมต่ออินเทอร์เน็ต\n\n## ขั้นตอน\n\n1. เปิด **Company Portal** แล้วติดตั้ง *Contoso VPN*\n2. เปิดโปรแกรม VPN แล้วเลือก **Sign in with Microsoft**\n3. อนุมัติการลงชื่อเข้าใช้ในแอป Authenticator\n\n> หากโปรแกรมแสดง `Error 809` แสดงว่าเราเตอร์ที่บ้านบล็อก VPN — ลองใช้ฮอตสปอตจากมือถือ",
       type: "HOW_TO", visibility: "EMPLOYEES", status: "PUBLISHED", category: "NW-VPN", tags: ["vpn", "remote"],
       body: "## Before you start\n\n- You need a company laptop.\n- You need an internet connection.\n\n## Steps\n\n1. Open **Company Portal** and install *Contoso VPN*.\n2. Start the VPN client and choose **Sign in with Microsoft**.\n3. Approve the sign-in in the Authenticator app.\n\n> If the client shows `Error 809`, your home router blocks VPN traffic — try a mobile hotspot.",
     },
     {
       title: "Printer shows Offline", summary: "Quick checks when a shared printer shows as offline on your computer.",
+      titleTh: "เครื่องพิมพ์แสดงสถานะออฟไลน์", summaryTh: "สิ่งที่ควรตรวจสอบเมื่อเครื่องพิมพ์ที่ใช้ร่วมกันแสดงสถานะออฟไลน์บนคอมพิวเตอร์ของคุณ",
+      bodyTh: "## อาการ\n\nเครื่องพิมพ์แสดงสถานะ *Offline* และงานพิมพ์ค้างอยู่ในคิว\n\n## วิธีแก้ไข\n\n1. ตรวจสอบหน้าจอเครื่องพิมพ์ว่ามีกระดาษติดหรือข้อผิดพลาดหรือไม่\n2. บนคอมพิวเตอร์ เปิด **Settings › Printers** เลือกเครื่องพิมพ์ แล้วเลือก **Use printer online**\n3. ลบงานที่ค้างแล้วสั่งพิมพ์ใหม่\n\nหากผู้อื่นได้รับผลกระทบด้วย ให้สร้างทิกเก็ตและระบุชื่อเครื่องพิมพ์ตามฉลาก",
       type: "TROUBLESHOOTING", visibility: "EMPLOYEES", status: "PUBLISHED", category: "HW-PR", tags: ["printer"],
       body: "## Symptoms\n\nThe printer is listed as *Offline* and jobs stay in the queue.\n\n## Solution\n\n1. Check the printer display for paper jams or errors.\n2. On your computer open **Settings › Printers**, select the printer and choose **Use printer online**.\n3. Delete stuck jobs and print again.\n\nIf other people are also affected, create a ticket and mention the printer name on the label.",
     },
     {
-      title: "How do I reset my password? (วิธีรีเซ็ตรหัสผ่าน)", summary: "Reset your Microsoft 365 password yourself — รีเซ็ตรหัสผ่านด้วยตัวเอง",
+      title: "How do I reset my password?", oldTitle: "How do I reset my password? (วิธีรีเซ็ตรหัสผ่าน)", summary: "Reset your Microsoft 365 password yourself.",
+      titleTh: "วิธีรีเซ็ตรหัสผ่าน", summaryTh: "รีเซ็ตรหัสผ่าน Microsoft 365 ได้ด้วยตัวเอง",
+      bodyTh: "เปิด[หน้ารีเซ็ตรหัสผ่าน](https://passwordreset.microsoftonline.com/) แล้วทำตามขั้นตอน ต้องใช้หมายเลขโทรศัพท์มือถือที่ลงทะเบียนไว้",
       type: "FAQ", visibility: "EMPLOYEES", status: "PUBLISHED", category: "M365", tags: ["password", "account"],
-      body: "Go to [the password reset page](https://passwordreset.microsoftonline.com/) and follow the steps. You need your registered mobile number.\n\nวิธีรีเซ็ตรหัสผ่าน: เปิดหน้ารีเซ็ตรหัสผ่าน แล้วทำตามขั้นตอน",
+      body: "Go to [the password reset page](https://passwordreset.microsoftonline.com/) and follow the steps. You need your registered mobile number.",
     },
     {
       title: "POS terminal frozen: safe restart procedure", summary: "Store-side restart sequence for frozen POS terminals (support staff).",
+      titleTh: "เครื่อง POS ค้าง: ขั้นตอนการรีสตาร์ทอย่างปลอดภัย", summaryTh: "ลำดับการรีสตาร์ทเครื่อง POS ที่ค้างที่หน้าร้าน (สำหรับเจ้าหน้าที่)",
+      bodyTh: "## ขั้นตอน\n\n1. ให้แคชเชียร์ทำรายการที่ค้างให้เสร็จหรือยกเลิกรายการ\n2. กดปุ่มเปิด/ปิดค้างไว้ 10 วินาที\n3. หลังรีสตาร์ท ตรวจสอบการจับคู่เครื่องรับชำระเงินที่ **Settings › Devices**\n\nยกระดับไปยังทีมระบบหน้าร้านหากเครื่องไม่เชื่อมต่อภายใน 5 นาที",
       type: "TROUBLESHOOTING", visibility: "SUPPORT_ONLY", status: "PUBLISHED", category: "RTL-POS", tags: ["pos", "retail"],
       body: "## Steps\n\n1. Ask the cashier to finish or void the open transaction.\n2. Hold the power button for 10 seconds.\n3. After restart, check the payment terminal pairing under **Settings › Devices**.\n\nEscalate to Retail Systems if the terminal does not reconnect within 5 minutes.",
     },
     {
       title: "Guest Wi-Fi access for visitors", summary: "Draft — how reception requests guest Wi-Fi vouchers.",
+      titleTh: "การขอใช้ Wi-Fi สำหรับผู้มาติดต่อ", summaryTh: "ฉบับร่าง — วิธีที่แผนกต้อนรับขอรหัส Wi-Fi สำหรับผู้มาติดต่อ",
+      bodyTh: "แผนกต้อนรับขอรหัส Wi-Fi รายวันสำหรับผู้มาติดต่อได้ผ่านทิกเก็ตคำขอด้านไอที (ฉบับร่าง — กระบวนการยังอยู่ระหว่างตกลง)",
       type: "HOW_TO", visibility: "EMPLOYEES", status: "DRAFT", category: "NW-WIFI", tags: ["wifi"],
       body: "Reception can request daily guest vouchers through an IT Request ticket. (Draft — process still being agreed.)",
     },
   ];
   for (const a of articles) {
-    if (await prisma.kbArticle.findFirst({ where: { title: a.title } })) continue;
+    const existing = await prisma.kbArticle.findFirst({ where: { title: { in: [a.title, a.oldTitle ?? a.title] } } });
+    if (existing) {
+      // Add the Thai version to starter articles seeded before bilingual support (admin edits are kept).
+      if (!existing.titleTh && !existing.bodyTh) {
+        await prisma.kbArticle.update({ where: { id: existing.id }, data: { titleTh: a.titleTh, summaryTh: a.summaryTh, bodyTh: a.bodyTh,
+          ...(existing.title === a.oldTitle ? { title: a.title, summary: a.summary, body: a.body } : {}) } });
+      }
+      continue;
+    }
     const number = await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ prefix: string; current: number }[]>`UPDATE "NumberSequence" SET "current" = "current" + 1, "updatedAt" = NOW() WHERE "key" = 'KB' RETURNING "prefix", "current"`;
       return `${rows[0]!.prefix}-${String(rows[0]!.current).padStart(6, "0")}`;
     });
     await prisma.kbArticle.create({
-      data: { number, title: a.title, summary: a.summary, body: a.body, type: a.type, visibility: a.visibility, status: a.status,
+      data: { number, title: a.title, summary: a.summary, body: a.body, titleTh: a.titleTh, summaryTh: a.summaryTh, bodyTh: a.bodyTh, type: a.type, visibility: a.visibility, status: a.status,
         categoryId: await cat(a.category), tags: a.tags, authorId: author.id, publishedAt: a.status === "PUBLISHED" ? new Date() : null },
     });
   }

@@ -1,3 +1,4 @@
+import { nameTh } from "@/i18n/server-text";
 import { randomUUID, createHash } from "node:crypto";
 import type { Prisma, StatusKind } from "@prisma/client";
 import { prisma } from "@/server/db";
@@ -27,6 +28,8 @@ import { getSettings } from "./settings";
 import { applyStatusChange, computeSlaTargets, recordFirstResponse, startClocks } from "./sla";
 import { normaliseCreateImpact, validateImpact } from "@/server/domain/impact";
 import { planApprovals, startApprovals } from "./approvals";
+import { ln } from "@/lib/localized";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { AttachmentBlockedError, AttachmentScanPendingError, downloadDecision, initialScanStatus, refreshScan } from "@/server/storage/malware-scan";
 import { enqueueTeamsCard } from "@/server/integrations/teams";
 
@@ -79,14 +82,14 @@ function viewWhere(actor: Actor, view: TicketView, now: Date): Prisma.TicketWher
 }
 
 export const ticketListInclude = {
-  category: { select: { id: true, name: true } },
-  subcategory: { select: { id: true, name: true } },
-  priority: { select: { id: true, code: true, name: true, color: true, level: true } },
-  status: { select: { id: true, name: true, color: true, kind: true, pausesSla: true } },
+  category: { select: { id: true, name: true, nameTh: true } },
+  subcategory: { select: { id: true, name: true, nameTh: true } },
+  priority: { select: { id: true, code: true, name: true, nameTh: true, color: true, level: true } },
+  status: { select: { id: true, name: true, nameTh: true, color: true, kind: true, pausesSla: true } },
   requester: { select: { id: true, displayName: true, email: true } },
-  department: { select: { id: true, name: true } },
-  branch: { select: { id: true, name: true } },
-  ownerTeam: { select: { id: true, name: true, code: true } },
+  department: { select: { id: true, name: true, nameTh: true } },
+  branch: { select: { id: true, name: true, nameTh: true } },
+  ownerTeam: { select: { id: true, name: true, nameTh: true, code: true } },
   assignedAgent: { select: { id: true, displayName: true } },
   slaEvents: { where: { type: "WARNING" }, select: { clock: true }, take: 2 },
 } satisfies Prisma.TicketInclude;
@@ -157,7 +160,7 @@ export async function ticketSummary(actor: Actor, narrow: Prisma.TicketWhereInpu
   return {
     total,
     overdue,
-    statuses: statuses.map((s) => ({ id: s.id, name: s.name, kind: s.kind, color: s.color, count: byStatus.get(s.id) ?? 0 })),
+    statuses: statuses.map((s) => ({ id: s.id, name: s.name, nameTh: s.nameTh, kind: s.kind, color: s.color, count: byStatus.get(s.id) ?? 0 })),
   };
 }
 
@@ -169,11 +172,11 @@ export async function getTicketDetail(actor: Actor, idOrNumber: string) {
     include: {
       ...ticketListInclude,
       company: { select: { id: true, name: true } },
-      location: { select: { id: true, name: true } },
+      location: { select: { id: true, name: true, nameTh: true } },
       createdBy: { select: { id: true, displayName: true } },
       requester: {
         select: { id: true, displayName: true, email: true, employeeId: true, jobTitle: true, contactNumber: true,
-          department: { select: { name: true } }, branch: { select: { name: true } } },
+          department: { select: { name: true, nameTh: true } }, branch: { select: { name: true, nameTh: true } } },
       },
       slaProfile: { select: { id: true, name: true, warningPercent: true } },
       attachments: {
@@ -182,10 +185,10 @@ export async function getTicketDetail(actor: Actor, idOrNumber: string) {
         orderBy: { createdAt: "asc" },
       },
       history: { include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 500 },
-      supportingTeams: { include: { team: { select: { id: true, name: true, type: true } } }, orderBy: { addedAt: "asc" } },
+      supportingTeams: { include: { team: { select: { id: true, name: true, nameTh: true, type: true } } }, orderBy: { addedAt: "asc" } },
       assignments: {
         include: {
-          prevTeam: { select: { name: true } }, newTeam: { select: { name: true } },
+          prevTeam: { select: { name: true, nameTh: true } }, newTeam: { select: { name: true, nameTh: true } },
           prevAgent: { select: { displayName: true } }, newAgent: { select: { displayName: true } },
           changedBy: { select: { displayName: true } },
         },
@@ -465,9 +468,9 @@ export async function createTicket(actor: Actor, raw: unknown, files: UploadCand
         extraFacts: [["Category", `${category.name}${subcategory ? ` › ${subcategory.name}` : ""}`], ["Requester", requester.displayName]], tone: "accent" });
       const link = `/tickets/${number}`;
       const teamUsers = routing.agentId ? [routing.agentId] : await teamMemberIds(tx, routing.teamId);
-      await notifyUsers(tx, teamUsers, { type: "TICKET_CREATED", title: `New ticket ${number}`, body: input.subject, ticketId: ticket.id, link }, actor);
+      await notifyUsers(tx, teamUsers, { type: "TICKET_CREATED", key: "ticketCreated", params: { number, subject: input.subject }, title: `New ticket ${number}`, body: input.subject, ticketId: ticket.id, link }, actor);
       if (requester.id !== actor.id) {
-        await notifyUsers(tx, [requester.id], { type: "TICKET_CREATED", title: `Ticket ${number} was logged for you`, body: input.subject, ticketId: ticket.id, link }, actor);
+        await notifyUsers(tx, [requester.id], { type: "TICKET_CREATED", key: "ticketLogged", params: { number, subject: input.subject }, title: `Ticket ${number} was logged for you`, body: input.subject, ticketId: ticket.id, link }, actor);
       }
       return { id: ticket.id, number };
     });
@@ -554,7 +557,7 @@ export async function changeTicketStatus(
     });
     const type = to.kind === "RESOLVED" ? "TICKET_RESOLVED" : to.kind === "CLOSED" ? "TICKET_CLOSED" : "STATUS_CHANGED";
     await notifyUsers(tx, [ticket.requesterId, ticket.assignedAgentId], {
-      type, title: `${ticket.number}: ${ticket.status.name} → ${to.name}`, body: input.reason ?? input.resolutionSummary ?? ticket.subject,
+      type, key: "statusChanged", params: { number: ticket.number, from: ticket.status.name, fromTh: nameTh(ticket.status), to: to.name, toTh: nameTh(to), text: input.reason ?? input.resolutionSummary ?? ticket.subject }, title: `${ticket.number}: ${ticket.status.name} → ${to.name}`, body: input.reason ?? input.resolutionSummary ?? ticket.subject,
       ticketId: ticket.id, link: `/tickets/${ticket.number}`,
     }, actor);
   });
@@ -643,15 +646,15 @@ export async function assignTicket(actor: Actor, input: { ticketId: string; team
     const link = `/tickets/${ticket.number}`;
     if (newAgentId) {
       await notifyUsers(tx, [newAgentId], { type: type === "ASSIGN" ? "TICKET_ASSIGNED" : "TICKET_REASSIGNED",
-        title: `${ticket.number} assigned to you`, body: ticket.subject, ticketId: ticket.id, link }, actor);
+        key: "assignedToYou", params: { number: ticket.number, subject: ticket.subject }, title: `${ticket.number} assigned to you`, body: ticket.subject, ticketId: ticket.id, link }, actor);
     }
     if (teamChanged) {
       await notifyUsers(tx, await teamMemberIds(tx, newTeamId), { type: "TICKET_TRANSFERRED",
-        title: `${ticket.number} transferred to ${team.name}`, body: input.reason, ticketId: ticket.id, link }, actor);
+        key: "transferred", params: { number: ticket.number, team: team.name, teamTh: nameTh(team), reason: input.reason ?? "" }, title: `${ticket.number} transferred to ${team.name}`, body: input.reason, ticketId: ticket.id, link }, actor);
       await enqueueTeamsCard(tx, { teamId: newTeamId, event: "TICKET_TRANSFERRED", ticketId: ticket.id, title: `${ticket.number} transferred to ${team.name}`,
         extraFacts: [["Reason", input.reason]], tone: "accent" });
     }
-    await notifyUsers(tx, [ticket.requesterId], { type: "TICKET_ASSIGNED", title: `${ticket.number} has been assigned`,
+    await notifyUsers(tx, [ticket.requesterId], { type: "TICKET_ASSIGNED", key: "requesterAssigned", params: { number: ticket.number, subject: ticket.subject }, title: `${ticket.number} has been assigned`,
       body: ticket.subject, ticketId: ticket.id, link }, actor);
   });
 }
@@ -736,16 +739,16 @@ export async function readAttachment(actor: Actor, attachmentId: string) {
 
 // ───────────────────────────── Create-form options ─────────────────────────────
 
-export async function getCreateTicketOptions(actor: Actor) {
+export async function getCreateTicketOptions(actor: Actor, locale: Locale = DEFAULT_LOCALE) {
   const [categories, priorities, branches, settings] = await Promise.all([
     prisma.category.findMany({
       where: { parentId: null, isActive: true, deletedAt: null },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
-        id: true, name: true, requiredFields: true, defaultPriorityId: true,
+        id: true, name: true, nameTh: true, requiredFields: true, defaultPriorityId: true,
         children: {
           where: { isActive: true, deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          select: { id: true, name: true, requiredFields: true, defaultPriorityId: true },
+          select: { id: true, name: true, nameTh: true, requiredFields: true, defaultPriorityId: true },
         },
       },
     }),
@@ -753,15 +756,16 @@ export async function getCreateTicketOptions(actor: Actor) {
     prisma.branch.findMany({
       where: { isActive: true, deletedAt: null, ...(actor.companyId ? { companyId: actor.companyId } : {}) },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, locations: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } } },
+      select: { id: true, name: true, nameTh: true, locations: { where: { isActive: true, deletedAt: null }, select: { id: true, name: true, nameTh: true }, orderBy: { name: "asc" } } },
     }),
     getSettings(prisma),
   ]);
   return {
-    categories: categories.map((c) => ({ ...c, requiredFields: c.requiredFields as string[],
-      children: c.children.map((s) => ({ ...s, requiredFields: s.requiredFields as string[] })) })),
-    priorities,
-    branches,
+    // Names are localized here so client components can render them directly.
+    categories: categories.map((c) => ({ ...c, name: ln(c, locale), requiredFields: c.requiredFields as string[],
+      children: c.children.map((s) => ({ ...s, name: ln(s, locale), requiredFields: s.requiredFields as string[] })) })),
+    priorities: priorities.map((p) => ({ ...p, name: ln(p, locale) })),
+    branches: branches.map((b) => ({ ...b, name: ln(b, locale), locations: b.locations.map((l) => ({ ...l, name: ln(l, locale) })) })),
     canSetPriority: settings["tickets.requesterCanSetPriority"] || can(actor, P.TICKET_UPDATE),
     maxFileSizeMb: settings["attachments.maxFileSizeMb"],
     maxFiles: settings["attachments.maxFilesPerUpload"],

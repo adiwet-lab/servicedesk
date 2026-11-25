@@ -11,6 +11,8 @@ import { getSettings } from "@/server/services/settings";
 import { encryptSecret, decryptSecret, maskUrl } from "@/server/integrations/crypto";
 import { buildAdaptiveCard, TEAMS_EVENTS, validateTeamsWebhook } from "@/server/integrations/teams";
 import { httpRequest } from "@/server/integrations/http";
+import { translateServerText } from "@/i18n/server-text-translate";
+import { ln } from "@/lib/localized";
 import { assertOutboundUrl } from "@/server/integrations/ssrf";
 import { clearAssetCache, lookupAsset } from "@/server/integrations/assets";
 import { graphConfigured, syncTenantDirectory } from "@/server/integrations/graph";
@@ -29,7 +31,7 @@ export async function getIntegrationsOverview(actor: Actor) {
   const [settings, tenants, teams, tokens, outbox, counts] = await Promise.all([
     getSettings(prisma),
     prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, type: true, entraTenantId: true, isActive: true, autoProvisionUsers: true, graphSyncEnabled: true, lastGraphSyncAt: true, lastGraphSyncResult: true } }),
-    prisma.supportTeam.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true, teamsWebhookEnc: true } }),
+    prisma.supportTeam.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, nameTh: true, type: true, teamsWebhookEnc: true } }),
     listApiTokens(actor),
     prisma.integrationOutbox.findMany({ orderBy: { createdAt: "desc" }, take: 30, select: { id: true, channel: true, event: true, target: true, status: true, attempts: true, lastError: true, createdAt: true, sentAt: true, nextAttemptAt: true } }),
     prisma.integrationOutbox.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -98,7 +100,9 @@ export async function testTeamWebhook(actor: Actor, teamId: string) {
   const team = await prisma.supportTeam.findUnique({ where: { id: teamId } });
   if (!team?.teamsWebhookEnc) throw new ValidationError("This team has no Teams webhook.");
   const url = validateTeamsWebhook(decryptSecret(team.teamsWebhookEnc));
-  const card = buildAdaptiveCard({ title: "✅ Service Desk connection test", subtitle: team.name, facts: [["Sent by", actor.displayName], ["Time", new Date().toISOString()]], tone: "good" });
+  const loc = (await getSettings(prisma))["i18n.defaultLocale"];
+  const tr = (x: string) => translateServerText(x, loc);
+  const card = buildAdaptiveCard({ title: tr("✅ Service Desk connection test"), subtitle: ln(team, loc), facts: [[tr("Sent by"), actor.displayName], [tr("Time"), new Date().toISOString()]], tone: "good" }, loc);
   try {
     await httpRequest(url.toString(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card), timeoutMs: 10_000 });
   } catch (e) {

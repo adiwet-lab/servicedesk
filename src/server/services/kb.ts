@@ -10,6 +10,8 @@ import { PERMISSIONS as P } from "@/server/authz/permissions";
 import { canWorkTicket, ticketScopeWhere } from "@/server/authz/scope";
 import { enforceRateLimit } from "@/server/ratelimit";
 import { markdownToText } from "@/lib/markdown";
+import { ln, pickLang } from "@/lib/localized";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { audit } from "./audit";
 import { nextNumber } from "./numbering";
 
@@ -40,7 +42,9 @@ function kbReadSql(actor: Actor, management: boolean): Prisma.Sql {
 
 // ───────────────────────────── Search ─────────────────────────────
 
-const TSV = Prisma.sql`to_tsvector('simple', coalesce(a."title", '') || ' ' || coalesce(a."summary", '') || ' ' || coalesce(a."body", ''))`;
+const TSV = Prisma.sql`to_tsvector('simple',
+    coalesce(a."title", '') || ' ' || coalesce(a."summary", '') || ' ' || coalesce(a."body", '') || ' ' ||
+    coalesce(a."titleTh", '') || ' ' || coalesce(a."summaryTh", '') || ' ' || coalesce(a."bodyTh", ''))`;
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 /** Word tokens (letters/digits in any script) for OR-queries; capped to keep the query cheap. */
 export function searchTerms(q: string, max = 12): string[] {
@@ -48,7 +52,7 @@ export function searchTerms(q: string, max = 12): string[] {
   return [...new Set(words)].slice(0, max);
 }
 
-export interface KbSearchOptions { categoryId?: string; type?: keyof typeof KB_TYPE_LABEL; limit?: number; management?: boolean; status?: KbStatus; match?: "all" | "any" }
+export interface KbSearchOptions { categoryId?: string; type?: keyof typeof KB_TYPE_LABEL; limit?: number; management?: boolean; status?: KbStatus; match?: "all" | "any"; locale?: Locale }
 
 /**
  * Ranked search: Postgres full text (simple config, GIN-indexed) OR case-insensitive
@@ -75,9 +79,9 @@ export async function searchArticleIds(actor: Actor, q: string, o: KbSearchOptio
     : Prisma.sql`plainto_tsquery('simple', ${query})`;
   const likes = (o.match === "any" ? terms.filter((t) => t.length >= 3) : [query]).map((t) => `%${likeEscape(t)}%`);
   const likeCond = likes.length
-    ? Prisma.join(likes.map((l) => Prisma.sql`(a."title" ILIKE ${l} OR a."summary" ILIKE ${l} OR a."body" ILIKE ${l})`), " OR ")
+    ? Prisma.join(likes.map((l) => Prisma.sql`(a."title" ILIKE ${l} OR a."summary" ILIKE ${l} OR a."body" ILIKE ${l} OR a."titleTh" ILIKE ${l} OR a."summaryTh" ILIKE ${l} OR a."bodyTh" ILIKE ${l})`), " OR ")
     : Prisma.sql`FALSE`;
-  const titleHit = likes.length ? Prisma.join(likes.map((l) => Prisma.sql`(a."title" ILIKE ${l})::int`), " + ") : Prisma.sql`0`;
+  const titleHit = likes.length ? Prisma.join(likes.map((l) => Prisma.sql`(a."title" ILIKE ${l} OR coalesce(a."titleTh", '') ILIKE ${l})::int`), " + ") : Prisma.sql`0`;
   const rows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT a."id" FROM "KbArticle" a
      WHERE ${Prisma.join(conds, " AND ")} AND (${TSV} @@ ${tsq} OR ${likeCond})
@@ -87,28 +91,36 @@ export async function searchArticleIds(actor: Actor, q: string, o: KbSearchOptio
 }
 
 const listSelect = {
-  id: true, number: true, title: true, summary: true, body: true, type: true, visibility: true, status: true, tags: true,
+  id: true, number: true, title: true, summary: true, body: true, titleTh: true, summaryTh: true, bodyTh: true, type: true, visibility: true, status: true, tags: true,
   viewCount: true, helpfulYes: true, helpfulNo: true, publishedAt: true, updatedAt: true,
-  category: { select: { id: true, name: true, parent: { select: { name: true } } } },
+  category: { select: { id: true, name: true, nameTh: true, parent: { select: { name: true, nameTh: true } } } },
   author: { select: { displayName: true } },
 } satisfies Prisma.KbArticleSelect;
 
-async function hydrate(ids: string[]) {
+type ListRow = Prisma.KbArticleGetPayload<{ select: typeof listSelect }>;
+/** Title/snippet in the viewer's language (falls back to the other language). */
+function present({ body, bodyTh, ...r }: ListRow, locale: Locale) {
+  const title = pickLang(r.title, r.titleTh, locale);
+  const summary = pickLang(r.summary, r.summaryTh, locale);
+  return { ...r, title, snippet: summary || markdownToText(pickLang(body, bodyTh, locale), 200) };
+}
+
+async function hydrate(ids: string[], locale: Locale = DEFAULT_LOCALE) {
   if (!ids.length) return [];
   const rows = await prisma.kbArticle.findMany({ where: { id: { in: ids } }, select: listSelect });
   const byId = new Map(rows.map((r) => [r.id, r]));
-  return ids.map((id) => byId.get(id)!).filter(Boolean).map(({ body, ...r }) => ({ ...r, snippet: r.summary || markdownToText(body, 200) }));
+  return ids.map((id) => byId.get(id)!).filter(Boolean).map((r) => present(r, locale));
 }
 
 export async function searchArticles(actor: Actor, q: string, o: KbSearchOptions = {}) {
-  return hydrate(await searchArticleIds(actor, q, o));
+  return hydrate(await searchArticleIds(actor, q, o), o.locale);
 }
 
 /** Deflection suggestions for the create-ticket form (published, visible to the actor). */
-export async function suggestArticles(actor: Actor, text: string, categoryId?: string) {
+export async function suggestArticles(actor: Actor, text: string, categoryId?: string, locale: Locale = DEFAULT_LOCALE) {
   if (searchTerms(text).length === 0 && text.trim().length < 3) return [];
   const ids = await searchArticleIds(actor, text, { limit: 5, match: "any", categoryId: categoryId || undefined });
-  return hydrate(ids);
+  return hydrate(ids, locale);
 }
 
 // ───────────────────────────── Read ─────────────────────────────
@@ -117,7 +129,7 @@ export async function getArticle(actor: Actor, number: string, opts: { countView
   const a = await prisma.kbArticle.findFirst({
     where: { AND: [kbReadWhere(actor, { management: opts.management }), { number }] },
     include: {
-      category: { select: { id: true, name: true, parent: { select: { id: true, name: true } } } },
+      category: { select: { id: true, name: true, nameTh: true, parent: { select: { id: true, name: true, nameTh: true } } } },
       author: { select: { displayName: true } }, updatedBy: { select: { displayName: true } },
       sourceTicket: { select: { id: true, number: true } },
     },
@@ -139,7 +151,7 @@ export async function getArticle(actor: Actor, number: string, opts: { countView
 }
 
 /** Help Center landing data: categories with article counts + most viewed + FAQs. */
-export async function helpCenterHome(actor: Actor) {
+export async function helpCenterHome(actor: Actor, locale: Locale = DEFAULT_LOCALE) {
   const where = kbReadWhere(actor);
   const [popular, faqs, cats] = await Promise.all([
     prisma.kbArticle.findMany({ where, orderBy: [{ viewCount: "desc" }, { updatedAt: "desc" }], take: 6, select: listSelect }),
@@ -147,58 +159,70 @@ export async function helpCenterHome(actor: Actor) {
     prisma.kbArticle.groupBy({ by: ["categoryId"], where, _count: { _all: true } }),
   ]);
   const catIds = cats.map((c) => c.categoryId).filter((x): x is string => !!x);
-  const catRows = await prisma.category.findMany({ where: { id: { in: catIds } }, select: { id: true, name: true, parentId: true, parent: { select: { id: true, name: true } } } });
+  const catRows = await prisma.category.findMany({ where: { id: { in: catIds } }, select: { id: true, name: true, nameTh: true, parentId: true, parent: { select: { id: true, name: true, nameTh: true } } } });
   // Roll subcategories up to their main category.
   const mains = new Map<string, { id: string; name: string; count: number }>();
   for (const c of cats) {
     const row = catRows.find((r) => r.id === c.categoryId);
     if (!row) continue;
-    const main = row.parent ?? { id: row.id, name: row.name };
+    const main = row.parent ? { id: row.parent.id, name: ln(row.parent, locale) } : { id: row.id, name: ln(row, locale) };
     const m = mains.get(main.id) ?? { ...main, count: 0 };
     m.count += c._count._all;
     mains.set(main.id, m);
   }
-  const strip = (rows: typeof popular) => rows.map(({ body, ...r }) => ({ ...r, snippet: r.summary || markdownToText(body, 200) }));
-  return { popular: strip(popular), faqs: strip(faqs), categories: [...mains.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+  const strip = (rows: typeof popular) => rows.map((r) => present(r, locale));
+  return { popular: strip(popular), faqs: strip(faqs), categories: [...mains.values()].sort((a, b) => a.name.localeCompare(b.name, locale)) };
 }
 
 /** Published articles linked to (or in the same category as) a ticket. */
-export async function relatedArticlesForTicket(actor: Actor, ticketId: string) {
+export async function relatedArticlesForTicket(actor: Actor, ticketId: string, locale: Locale = DEFAULT_LOCALE) {
   const t = await prisma.ticket.findFirst({ where: { AND: [ticketScopeWhere(actor), { id: ticketId }] }, select: { id: true, categoryId: true, subcategoryId: true } });
   if (!t) return [];
   const where = kbReadWhere(actor, { management: true }); // writers also see drafts linked to the ticket
-  const linked = await prisma.kbArticle.findMany({ where: { AND: [where, { OR: [{ tickets: { some: { ticketId: t.id } } }, { sourceTicketId: t.id }] }] }, select: { id: true, number: true, title: true, status: true }, take: 5 });
+  const linked = await prisma.kbArticle.findMany({ where: { AND: [where, { OR: [{ tickets: { some: { ticketId: t.id } } }, { sourceTicketId: t.id }] }] }, select: { id: true, number: true, title: true, titleTh: true, status: true }, take: 5 });
   const sameCat = await prisma.kbArticle.findMany({
     where: { AND: [kbReadWhere(actor), { id: { notIn: linked.map((l) => l.id) } }, { categoryId: { in: [t.subcategoryId, t.categoryId].filter((x): x is string => !!x) } }] },
-    orderBy: [{ helpfulYes: "desc" }, { viewCount: "desc" }], take: 5, select: { id: true, number: true, title: true, status: true },
+    orderBy: [{ helpfulYes: "desc" }, { viewCount: "desc" }], take: 5, select: { id: true, number: true, title: true, titleTh: true, status: true },
   });
-  return [...linked.map((a) => ({ ...a, linked: true })), ...sameCat.map((a) => ({ ...a, linked: false }))];
+  const L = <T extends { title: string; titleTh: string | null }>(a: T) => ({ ...a, title: pickLang(a.title, a.titleTh, locale) });
+  return [...linked.map((a) => ({ ...L(a), linked: true })), ...sameCat.map((a) => ({ ...L(a), linked: false }))];
 }
 
 /** Management list (/admin/kb). */
-export async function listArticlesForAdmin(actor: Actor, f: { q?: string; status?: KbStatus; categoryId?: string }) {
+export async function listArticlesForAdmin(actor: Actor, f: { q?: string; status?: KbStatus; categoryId?: string; locale?: Locale }) {
   if (!canWriteKb(actor) && !canPublishKb(actor)) throw new AuthorizationError();
-  if (f.q) return searchArticles(actor, f.q, { management: true, status: f.status, categoryId: f.categoryId, limit: 50 });
+  if (f.q) return searchArticles(actor, f.q, { management: true, status: f.status, categoryId: f.categoryId, limit: 50, locale: f.locale });
   const rows = await prisma.kbArticle.findMany({
     where: { ...(f.status ? { status: f.status } : {}), ...(f.categoryId ? { OR: [{ categoryId: f.categoryId }, { category: { parentId: f.categoryId } }] } : {}) },
     orderBy: { updatedAt: "desc" }, take: 200, select: listSelect,
   });
-  return rows.map(({ body, ...r }) => ({ ...r, snippet: r.summary || markdownToText(body, 200) }));
+  return rows.map((r) => present(r, f.locale ?? DEFAULT_LOCALE));
 }
 
 // ───────────────────────────── Write ─────────────────────────────
 
 const optId = z.preprocess((v) => (v === "" || v == null ? null : v), z.string().min(1).max(50).nullable());
 export const articleSchema = z.object({
-  title: z.string().trim().min(5, "Title must be at least 5 characters").max(200),
+  title: z.string().trim().max(200).default(""),
   summary: z.string().trim().max(500).default(""),
-  body: z.string().trim().min(20, "Article body must be at least 20 characters").max(50_000),
+  body: z.string().trim().max(50_000).default(""),
+  titleTh: z.string().trim().max(200).default(""),
+  summaryTh: z.string().trim().max(500).default(""),
+  bodyTh: z.string().trim().max(50_000).default(""),
   type: z.enum(["FAQ", "TROUBLESHOOTING", "HOW_TO"]).default("FAQ"),
   visibility: z.enum(["EMPLOYEES", "SUPPORT_ONLY"]).default("EMPLOYEES"),
   categoryId: optId,
   tags: z.preprocess((v) => (typeof v === "string" ? v.split(",") : v ?? []), z.array(z.string().trim().max(40)).max(20))
     .transform((a) => [...new Set(a.filter(Boolean).map((t) => t.toLowerCase()))]),
   changeNote: z.string().trim().max(500).optional(),
+}).superRefine((a, ctx) => {
+  // One article may be English, Thai or both — but each language used needs a title and a body.
+  const en = a.title || a.body, th = a.titleTh || a.bodyTh;
+  if (!en && !th) ctx.addIssue({ code: "custom", path: ["title"], message: "validation.kbOneLanguage" });
+  if (en && a.title.length < 5) ctx.addIssue({ code: "custom", path: ["title"], message: "validation.kbTitleMin" });
+  if (en && a.body.length < 20) ctx.addIssue({ code: "custom", path: ["body"], message: "validation.kbBodyMin" });
+  if (th && a.titleTh.length < 5) ctx.addIssue({ code: "custom", path: ["titleTh"], message: "validation.kbTitleMin" });
+  if (th && a.bodyTh.length < 20) ctx.addIssue({ code: "custom", path: ["bodyTh"], message: "validation.kbBodyMin" });
 });
 
 function parseArticle(raw: unknown) {
@@ -224,7 +248,8 @@ export async function createArticle(actor: Actor, raw: unknown, opts: { sourceTi
     const number = await nextNumber(tx, "KB");
     const a = await tx.kbArticle.create({
       data: {
-        number, title: input.title, summary: input.summary, body: input.body, type: input.type, visibility: input.visibility,
+        number, title: input.title, summary: input.summary, body: input.body,
+        titleTh: input.titleTh || null, summaryTh: input.summaryTh || null, bodyTh: input.bodyTh || null, type: input.type, visibility: input.visibility,
         categoryId: input.categoryId, tags: input.tags, authorId: actor.id, sourceTicketId: opts.sourceTicketId ?? null,
         ...(opts.sourceTicketId ? { tickets: { create: { ticketId: opts.sourceTicketId, linkedById: actor.id } } } : {}),
       },
@@ -244,14 +269,15 @@ export async function updateArticle(actor: Actor, articleId: string, raw: unknow
   await transaction(async (tx) => {
     const moved = await tx.kbArticle.updateMany({
       where: { id: a.id, version: a.version },
-      data: { title: input.title, summary: input.summary, body: input.body, type: input.type, visibility: input.visibility,
+      data: { title: input.title, summary: input.summary, body: input.body,
+        titleTh: input.titleTh || null, summaryTh: input.summaryTh || null, bodyTh: input.bodyTh || null, type: input.type, visibility: input.visibility,
         categoryId: input.categoryId, tags: input.tags, updatedById: actor.id, version: { increment: 1 } },
     });
     if (moved.count !== 1) throw new ValidationError("The article was changed by someone else. Reload and try again.");
     await audit(tx, actor, {
       action: "KB_UPDATED", entityType: "KbArticle", entityId: a.id,
       oldValue: { version: a.version, title: a.title, visibility: a.visibility, bodyLength: a.body.length },
-      newValue: { version: a.version + 1, title: input.title, visibility: input.visibility, bodyLength: input.body.length, note: input.changeNote ?? null },
+      newValue: { version: a.version + 1, title: input.title, titleTh: input.titleTh, visibility: input.visibility, bodyLength: input.body.length, bodyThLength: input.bodyTh.length, note: input.changeNote ?? null },
     });
   });
 }
@@ -268,7 +294,13 @@ export async function setArticleStatus(actor: Actor, articleId: string, status: 
 }
 
 /** Drafts an article from a resolved/closed ticket the actor works on. */
-export async function createArticleFromTicket(actor: Actor, ticketId: string) {
+/** Draft section headings in both languages (the draft is written in the author's UI language). */
+const DRAFT = {
+  en: { symptoms: "## Symptoms", solution: "## Solution", contact: "## When to contact IT", placeholder: "Describe the solution here.", contactText: "If these steps do not help, create a ticket and mention this article.", howTo: "How to fix:" },
+  th: { symptoms: "## อาการ", solution: "## วิธีแก้ไข", contact: "## เมื่อใดควรติดต่อฝ่ายไอที", placeholder: "อธิบายวิธีแก้ไขที่นี่", contactText: "หากทำตามขั้นตอนแล้วยังไม่หาย ให้สร้างทิกเก็ตและอ้างถึงบทความนี้", howTo: "วิธีแก้ไข:" },
+} as const;
+
+export async function createArticleFromTicket(actor: Actor, ticketId: string, locale: Locale = DEFAULT_LOCALE) {
   if (!canWriteKb(actor)) throw new AuthorizationError("You cannot write knowledge articles.");
   const t = await prisma.ticket.findFirst({
     where: { AND: [ticketScopeWhere(actor), { id: ticketId }] },
@@ -278,13 +310,15 @@ export async function createArticleFromTicket(actor: Actor, ticketId: string) {
   if (!can(actor, P.TICKET_READ_ALL) && !canWorkTicket(actor, t)) throw new AuthorizationError("You cannot create an article from this ticket.");
   if (!["RESOLVED", "CLOSED"].includes(t.status.kind)) throw new ValidationError("Only resolved or closed tickets can be turned into an article.");
   if (t.isConfidential) throw new ValidationError("Confidential tickets cannot be turned into an article.");
+  const d = DRAFT[locale];
   const body = [
-    "## Symptoms", "", t.description.trim(), "",
-    "## Solution", "", (t.resolutionSummary ?? "Describe the solution here.").trim(), "",
-    "## When to contact IT", "", "If these steps do not help, create a ticket and mention this article.",
+    d.symptoms, "", t.description.trim(), "",
+    d.solution, "", (t.resolutionSummary ?? d.placeholder).trim(), "",
+    d.contact, "", d.contactText,
   ].join("\n");
+  const title = t.subject.length >= 5 ? t.subject : `${d.howTo} ${t.subject}`;
   const a = await createArticle(actor, {
-    title: t.subject.length >= 5 ? t.subject : `How to fix: ${t.subject}`, summary: "", body, type: "TROUBLESHOOTING",
+    ...(locale === "th" ? { titleTh: title, bodyTh: body } : { title, body }), summary: "", type: "TROUBLESHOOTING",
     visibility: "SUPPORT_ONLY", categoryId: t.subcategoryId ?? t.categoryId, tags: [],
   }, { sourceTicketId: t.id });
   await prisma.ticketHistory.create({ data: { ticketId: t.id, actorId: actor.id, action: "KB_ARTICLE_CREATED", newValue: a.number } });
@@ -317,11 +351,12 @@ export async function giveFeedback(actor: Actor, articleId: string, raw: unknown
   });
 }
 
-export async function kbOptions() {
-  return prisma.category.findMany({
+export async function kbOptions(locale: Locale = DEFAULT_LOCALE) {
+  const rows = await prisma.category.findMany({
     where: { parentId: null, isActive: true, deletedAt: null }, orderBy: { sortOrder: "asc" },
-    select: { id: true, name: true, children: { where: { isActive: true, deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } } },
+    select: { id: true, name: true, nameTh: true, children: { where: { isActive: true, deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, nameTh: true } } },
   });
+  return rows.map((c) => ({ id: c.id, name: ln(c, locale), children: c.children.map((s) => ({ id: s.id, name: ln(s, locale) })) }));
 }
 
 export function requireKbManager(actor: Actor) {

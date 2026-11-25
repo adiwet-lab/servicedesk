@@ -2,9 +2,10 @@ import type { Actor } from "@/server/authz/actor";
 import { loadCrudPage, type EntityKey } from "@/server/services/admin/crud";
 import { PageHeader } from "@/components/ui/misc";
 import { CrudTable } from "./crud-table";
+import { currentLocale } from "@/i18n/server";
 
 export async function CrudPage({ actor, entity, rowLink, extra }: { actor: Actor; entity: EntityKey; rowLink?: { label: string; hrefPrefix: string }; extra?: React.ReactNode }) {
-  const page = await loadCrudPage(actor, entity);
+  const page = await loadCrudPage(actor, entity, await currentLocale());
   return (
     <div>
       <PageHeader title={page.title} description={page.description ?? undefined} />

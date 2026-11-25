@@ -21,7 +21,8 @@
     "dev:next": "next dev",
     "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=dist/server.js",
     "jobs:run": "tsx scripts/run-jobs.ts",
-    "audit:export": "tsx scripts/audit-export.ts"
+    "audit:export": "tsx scripts/audit-export.ts",
+    "lint:i18n": "tsx scripts/check-i18n.ts"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.34.0",
@@ -39,6 +40,7 @@
     "lucide-react": "^1.76.0",
     "next": "15.5.29",
     "next-auth": "5.0.0-beta.32",
+    "next-intl": "4.3.12",
     "next-themes": "^0.4.6",
     "prisma": "6.19.3",
     "react": "19.1.0",

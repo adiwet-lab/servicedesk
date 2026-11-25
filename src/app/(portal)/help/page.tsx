@@ -7,31 +7,35 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArticleList } from "@/components/kb/article-list";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
 
-export const metadata = { title: "Help Center" };
+export const generateMetadata = pageTitle("helpCenter");
 
 export default async function HelpCenterPage({ searchParams }: { searchParams: Promise<{ q?: string; category?: string }> }) {
   const actor = await requireActor();
   const sp = await searchParams;
   const q = (sp.q ?? "").slice(0, 200);
-  const home = await helpCenterHome(actor);
+  const [t, tp, locale] = await Promise.all([getTranslations("help"), getTranslations("pageTitle"), currentLocale()]);
+  const home = await helpCenterHome(actor, locale);
   const searching = !!q || !!sp.category;
-  const results = searching ? await searchArticles(actor, q, { categoryId: sp.category, limit: 30 }) : [];
+  const results = searching ? await searchArticles(actor, q, { categoryId: sp.category, limit: 30, locale }) : [];
   const activeCat = home.categories.find((c) => c.id === sp.category);
   return (
     <div className="space-y-5">
-      <PageHeader title="Help Center" description="Find answers and step-by-step guides before opening a ticket." />
+      <PageHeader title={tp("helpCenter")} description={t("description")} />
       <form className="flex gap-2" role="search">
         {sp.category && <input type="hidden" name="category" value={sp.category} />}
-        <Input name="q" defaultValue={q} placeholder="Search, e.g. “VPN”, “printer”, “รหัสผ่าน”" aria-label="Search articles" className="max-w-xl" data-testid="kb-search" />
-        <Button type="submit"><Search /> Search</Button>
+        <Input name="q" defaultValue={q} placeholder={t("searchPlaceholder")} aria-label={t("searchArticles")} className="max-w-xl" data-testid="kb-search" />
+        <Button type="submit"><Search /> {t("search")}</Button>
       </form>
       <div className="grid gap-5 lg:grid-cols-4">
         <Card className="lg:col-span-1">
-          <CardHeader><CardTitle className="text-base">Categories</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t("categories")}</CardTitle></CardHeader>
           <CardContent>
             <ul className="space-y-1 text-sm">
-              <li><Link href={q ? `/help?q=${encodeURIComponent(q)}` : "/help"} className={!sp.category ? "font-medium text-primary" : "hover:underline"}>All</Link></li>
+              <li><Link href={q ? `/help?q=${encodeURIComponent(q)}` : "/help"} className={!sp.category ? "font-medium text-primary" : "hover:underline"}>{t("all")}</Link></li>
               {home.categories.map((c) => (
                 <li key={c.id} className="flex justify-between">
                   <Link href={`/help?category=${c.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`} className={sp.category === c.id ? "font-medium text-primary" : "hover:underline"}>{c.name}</Link>
@@ -44,16 +48,16 @@ export default async function HelpCenterPage({ searchParams }: { searchParams: P
         <div className="space-y-5 lg:col-span-3">
           {searching ? (
             <Card>
-              <CardHeader><CardTitle className="text-base">{results.length} result(s){q ? ` for “${q}”` : ""}{activeCat ? ` in ${activeCat.name}` : ""}</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t("results", { count: results.length })}{q ? t("forQuery", { q }) : ""}{activeCat ? t("inCategory", { name: activeCat.name }) : ""}</CardTitle></CardHeader>
               <CardContent><ArticleList rows={results} hrefBase="/help" /></CardContent>
             </Card>
           ) : (
             <>
-              <Card><CardHeader><CardTitle className="text-base">Frequently asked questions</CardTitle></CardHeader><CardContent><ArticleList rows={home.faqs} hrefBase="/help" /></CardContent></Card>
-              <Card><CardHeader><CardTitle className="text-base">Most viewed</CardTitle></CardHeader><CardContent><ArticleList rows={home.popular} hrefBase="/help" /></CardContent></Card>
+              <Card><CardHeader><CardTitle className="text-base">{t("faq")}</CardTitle></CardHeader><CardContent><ArticleList rows={home.faqs} hrefBase="/help" /></CardContent></Card>
+              <Card><CardHeader><CardTitle className="text-base">{t("popular")}</CardTitle></CardHeader><CardContent><ArticleList rows={home.popular} hrefBase="/help" /></CardContent></Card>
             </>
           )}
-          <p className="text-sm text-muted-foreground">Didn&apos;t find what you need? <Link href="/tickets/new" className="text-primary hover:underline">Create a ticket</Link>.</p>
+          <p className="text-sm text-muted-foreground">{t("notFound")} <Link href="/tickets/new" className="text-primary hover:underline">{t("createTicket")}</Link></p>
         </div>
       </div>
     </div>

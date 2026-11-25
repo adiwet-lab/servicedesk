@@ -143,12 +143,12 @@ export async function runFeed(feed: Feed, sp: URLSearchParams, token: { includeN
       rows = list.map((e) => ({ ...e, createdAt: iso(e.createdAt) }));
       break;
     }
-    case "teams": rows = await prisma.supportTeam.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, type: true, isActive: true } }); break;
-    case "categories": rows = await prisma.category.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, parentId: true, isActive: true } }); break;
-    case "priorities": rows = await prisma.priority.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, level: true } }); break;
-    case "statuses": rows = await prisma.ticketStatus.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, kind: true, order: true } }); break;
-    case "branches": rows = await prisma.branch.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, companyId: true } }); break;
-    case "departments": rows = await prisma.department.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, companyId: true } }); break;
+    case "teams": rows = await prisma.supportTeam.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, nameTh: true, type: true, isActive: true } }); break;
+    case "categories": rows = await prisma.category.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, nameTh: true, parentId: true, isActive: true } }); break;
+    case "priorities": rows = await prisma.priority.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, nameTh: true, level: true } }); break;
+    case "statuses": rows = await prisma.ticketStatus.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, nameTh: true, kind: true, order: true } }); break;
+    case "branches": rows = await prisma.branch.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, nameTh: true, companyId: true } }); break;
+    case "departments": rows = await prisma.department.findMany({ ...page, orderBy: { id: "asc" }, select: { id: true, code: true, name: true, nameTh: true, companyId: true } }); break;
   }
   const more = rows.length > top;
   const value = more ? rows.slice(0, top) : rows;

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
+import { LanguageSwitcher } from "./language-switcher";
 import { Bell, Headset, LogOut, Menu, Moon, Search, Sun, ArrowLeftRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/misc";
@@ -12,7 +14,7 @@ import type { NavSection } from "./nav";
 import { Toaster } from "@/components/realtime/toaster";
 import { LiveIndicator, RealtimeProvider, useRealtimeContext } from "@/components/realtime/realtime-provider";
 
-export interface ShellUser { name: string; email: string; roles: string[]; tenant: string; vendor: boolean }
+export interface ShellUser { name: string; email: string; roles: { code: string; name: string }[]; tenant: string; vendor: boolean }
 
 type ShellProps = {
   nav: NavSection[]; user: ShellUser; unread: number; unreadMessages: number; portal: "user" | "admin"; canSwitch: boolean;
@@ -37,6 +39,8 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+  const t = useTranslations();
+  const roleLabel = (r: { code: string; name: string }) => (t.has(`roles.${r.code}` as never) ? t(`roles.${r.code}` as never) : r.name);
   const current = pathname + (search.toString() ? `?${search.toString()}` : "");
 
   const isActive = (href: string) => {
@@ -51,14 +55,14 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
       <div className="flex h-14 items-center gap-2.5 border-b border-white/5 px-5">
         <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary/20 text-sidebar-primary"><Headset className="size-4" /></div>
         <div className="leading-tight">
-          <p className="text-sm font-semibold text-white">IT Service Desk</p>
-          <p className="text-[11px] text-sidebar-muted">{portal === "admin" ? "Admin & Support Portal" : "User Portal"}</p>
+          <p className="text-sm font-semibold text-white">{t("shell.brand")}</p>
+          <p className="text-[11px] text-sidebar-muted">{portal === "admin" ? t("shell.adminPortal") : t("shell.userPortal")}</p>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Main">
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label={t("shell.mainNav")}>
         {nav.map((section, i) => (
           <div key={i} className="mb-4">
-            {section.title && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">{section.title}</p>}
+            {section.title && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">{t(section.title as never)}</p>}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon];
@@ -74,7 +78,7 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
                       )}
                     >
                       <Icon className={cn("size-4", active ? "text-sidebar-primary" : "text-sidebar-muted")} />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="flex-1 truncate">{t(item.label as never)}</span>
                       {item.badge === "messages" && badges.messages > 0 && (
                         <span className="rounded-full bg-sidebar-primary px-1.5 text-[10px] font-semibold text-sidebar" data-testid="nav-messages-badge">{badges.messages}</span>
                       )}
@@ -91,7 +95,7 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
         <div className="border-t border-white/5 p-3">
           <Link href={portal === "admin" ? "/dashboard" : "/admin"} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-sidebar-accent/60 hover:text-white">
             <ArrowLeftRight className="size-4 text-sidebar-muted" />
-            {portal === "admin" ? "Switch to User Portal" : "Switch to Admin Portal"}
+            {portal === "admin" ? t("shell.switchToUser") : t("shell.switchToAdmin")}
           </Link>
         </div>
       )}
@@ -105,12 +109,12 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
           <div className="relative h-full w-64">{sidebar}</div>
-          <button className="absolute left-[17rem] top-3 rounded-md bg-card p-2" onClick={() => setOpen(false)} aria-label="Close menu"><X className="size-4" /></button>
+          <button className="absolute left-[17rem] top-3 rounded-md bg-card p-2" onClick={() => setOpen(false)} aria-label={t("shell.closeMenu")}><X className="size-4" /></button>
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-card/90 px-4 backdrop-blur lg:px-6">
-          <button className="rounded-md p-2 hover:bg-accent lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button>
+          <button className="rounded-md p-2 hover:bg-accent lg:hidden" onClick={() => setOpen(true)} aria-label={t("shell.openMenu")}><Menu className="size-5" /></button>
           <form
             className="relative max-w-md flex-1"
             onSubmit={(e) => {
@@ -120,14 +124,15 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
             }}
           >
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input name="q" placeholder="Search tickets, requester, asset…" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" aria-label="Global search" />
+            <input name="q" placeholder={t("shell.searchPlaceholder")} className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" aria-label={t("shell.globalSearch")} />
           </form>
           <div className="ml-auto flex items-center gap-1">
+            <LanguageSwitcher className="mr-1" />
             <LiveIndicator />
-            <button className="rounded-md p-2 hover:bg-accent" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="Toggle dark mode">
+            <button className="rounded-md p-2 hover:bg-accent" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label={t("shell.toggleTheme")}>
               <Sun className="size-4 dark:hidden" /><Moon className="hidden size-4 dark:block" />
             </button>
-            <Link href="/notifications" className="relative rounded-md p-2 hover:bg-accent" aria-label={`Notifications (${unread} unread)`}>
+            <Link href="/notifications" className="relative rounded-md p-2 hover:bg-accent" aria-label={t("shell.notificationsUnread", { count: unread })}>
               <Bell className="size-4" />
               {unread > 0 && <span data-testid="bell-count" data-count={unread} className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}
             </Link>
@@ -136,20 +141,20 @@ function ShellInner({ nav, user, portal, canSwitch, signOutAction, children }: S
                 <Avatar name={user.name} />
                 <span className="hidden text-left leading-tight md:block">
                   <span className="block text-sm font-medium">{user.name}</span>
-                  <span className="block text-[11px] text-muted-foreground">{user.roles[0] ?? "User"}</span>
+                  <span className="block text-[11px] text-muted-foreground">{user.roles[0] ? roleLabel(user.roles[0]) : t("shell.userFallback")}</span>
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>
                   <p className="font-medium">{user.name}</p>
                   <p className="text-xs font-normal text-muted-foreground">{user.email}</p>
-                  <p className="mt-1 text-xs font-normal text-muted-foreground">{user.tenant}{user.vendor ? " · External" : ""}</p>
+                  <p className="mt-1 text-xs font-normal text-muted-foreground">{user.tenant}{user.vendor ? ` · ${t("shell.external")}` : ""}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild><Link href="/profile">Profile</Link></DropdownMenuItem>
-                {canSwitch && <DropdownMenuItem asChild><Link href={portal === "admin" ? "/dashboard" : "/admin"}>{portal === "admin" ? "User Portal" : "Admin Portal"}</Link></DropdownMenuItem>}
+                <DropdownMenuItem asChild><Link href="/profile">{t("shell.profile")}</Link></DropdownMenuItem>
+                {canSwitch && <DropdownMenuItem asChild><Link href={portal === "admin" ? "/dashboard" : "/admin"}>{portal === "admin" ? t("shell.userPortalShort") : t("shell.adminPortalShort")}</Link></DropdownMenuItem>}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => void signOutAction()} className="text-destructive"><LogOut /> Sign out</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void signOutAction()} className="text-destructive"><LogOut /> {t("shell.signOut")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

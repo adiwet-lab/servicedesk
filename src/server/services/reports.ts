@@ -1,4 +1,6 @@
 import { prisma } from "@/server/db";
+import { translateServerText } from "@/i18n/server-text-translate";
+import { ln } from "@/lib/localized";
 import type { Actor } from "@/server/authz/actor";
 import { requirePermission } from "@/server/authz/guards";
 import { NotFoundError } from "@/server/authz/errors";
@@ -33,7 +35,18 @@ function slaOutcome(target: number | null, metAt: Date | null, breached: boolean
  * Never includes message bodies or internal notes.
  */
 export async function runReport(actor: Actor, type: string, f: AnalyticsFilters, limit = MAX_REPORT_ROWS, now = new Date()): Promise<ReportResult> {
+  const r = await buildReport(actor, type, f, limit, now);
+  if (!f.locale || f.locale === "en") return r;
+  // Headers and fixed values (Yes/No, SLA outcomes) in the requester's language; data stays as stored.
+  const tr = (x: string) => translateServerText(x, f.locale!);
+  return { ...r, headers: r.headers.map(tr), rows: r.rows.map((row) => row.map((c) => (typeof c === "string" && FIXED_VALUES.has(c) ? tr(c) : c))) };
+}
+
+const FIXED_VALUES = new Set(["Yes", "No", "No SLA", "Met", "Met late", "Breached", "Paused", "Open"]);
+
+async function buildReport(actor: Actor, type: string, f: AnalyticsFilters, limit: number, now: Date): Promise<ReportResult> {
   requirePermission(actor, P.REPORT_EXPORT);
+  const L = (e: { name: string; nameTh: string | null }) => ln(e, f.locale ?? "en");
   if (!(type in REPORT_TYPES)) throw new NotFoundError("Unknown report type.");
   const t = type as ReportType;
 
@@ -41,9 +54,9 @@ export async function runReport(actor: Actor, type: string, f: AnalyticsFilters,
     const rows = await prisma.ticket.findMany({
       where: buildWhere(actor, f, "createdAt", now), take: limit + 1, orderBy: { createdAt: "asc" },
       include: {
-        category: { select: { name: true } }, subcategory: { select: { name: true } }, priority: { select: { code: true } },
-        status: { select: { name: true, kind: true } }, requester: { select: { displayName: true, email: true } }, company: { select: { name: true } },
-        department: { select: { name: true } }, branch: { select: { name: true } }, ownerTeam: { select: { name: true } }, assignedAgent: { select: { displayName: true } },
+        category: { select: { name: true, nameTh: true } }, subcategory: { select: { name: true, nameTh: true } }, priority: { select: { code: true } },
+        status: { select: { name: true, nameTh: true, kind: true } }, requester: { select: { displayName: true, email: true } }, company: { select: { name: true } },
+        department: { select: { name: true, nameTh: true } }, branch: { select: { name: true, nameTh: true } }, ownerTeam: { select: { name: true, nameTh: true } }, assignedAgent: { select: { displayName: true } },
       },
     });
     const truncated = rows.length > limit;
@@ -55,8 +68,8 @@ export async function runReport(actor: Actor, type: string, f: AnalyticsFilters,
           "Team", "Agent", "Confidential", "Created", "Updated", "First response", "Resolved", "Closed", "Age (days)", "Response SLA", "Resolution SLA",
           "Response target (min)", "Resolution target (min)", "First response (min)", "Resolution (min)"],
         rows: data.map((r) => [
-          r.number, r.subject, r.category.name, r.subcategory?.name ?? null, r.requester.displayName, r.requester.email, r.company?.name ?? null,
-          r.department?.name ?? null, r.branch?.name ?? null, r.priority.code, r.status.name, r.ownerTeam?.name ?? null, r.assignedAgent?.displayName ?? null,
+          r.number, r.subject, L(r.category), (r.subcategory ? L(r.subcategory) : null), r.requester.displayName, r.requester.email, r.company?.name ?? null,
+          (r.department ? L(r.department) : null), (r.branch ? L(r.branch) : null), r.priority.code, L(r.status), (r.ownerTeam ? L(r.ownerTeam) : null), r.assignedAgent?.displayName ?? null,
           r.isConfidential ? "Yes" : "No", iso(r.createdAt), iso(r.updatedAt), iso(r.firstResponseAt), iso(r.resolvedAt), iso(r.closedAt),
           ageInDays(r.createdAt, r.closedAt ?? r.resolvedAt ?? now),
           slaOutcome(r.responseTargetMin, r.firstResponseAt, r.responseBreached, !!r.slaPausedAt, r.responseDueAt, now),
@@ -70,7 +83,7 @@ export async function runReport(actor: Actor, type: string, f: AnalyticsFilters,
       headers: ["Ticket", "Priority", "Team", "Agent", "Status", "Created", "Response due", "First response", "Response SLA", "Resolution due", "Resolved",
         "Resolution SLA", "Paused (business min)", "Currently paused"],
       rows: data.map((r) => [
-        r.number, r.priority.code, r.ownerTeam?.name ?? null, r.assignedAgent?.displayName ?? null, r.status.name, iso(r.createdAt), iso(r.responseDueAt),
+        r.number, r.priority.code, (r.ownerTeam ? L(r.ownerTeam) : null), r.assignedAgent?.displayName ?? null, L(r.status), iso(r.createdAt), iso(r.responseDueAt),
         iso(r.firstResponseAt), slaOutcome(r.responseTargetMin, r.firstResponseAt, r.responseBreached, !!r.slaPausedAt, r.responseDueAt, now),
         iso(r.resolutionDueAt), iso(r.resolvedAt), slaOutcome(r.resolutionTargetMin, r.resolvedAt, r.resolutionBreached, !!r.slaPausedAt, r.resolutionDueAt, now),
         r.slaPausedMinutes, r.slaPausedAt && r.status.kind !== "RESOLVED" && r.status.kind !== "CLOSED" ? "Yes" : "No",
@@ -104,9 +117,9 @@ export async function runReport(actor: Actor, type: string, f: AnalyticsFilters,
     prisma.ticket.groupBy({ by: ["categoryId", "subcategoryId"], where: buildWhere(actor, f, "createdAt", now), _count: { _all: true } }),
     prisma.ticket.findMany({ where: buildWhere(actor, f, "resolvedAt", now), take: MAX_REPORT_ROWS,
       select: { categoryId: true, subcategoryId: true, createdAt: true, resolvedAt: true, resolutionTargetMin: true, resolutionBreached: true } }),
-    prisma.category.findMany({ select: { id: true, name: true } }),
+    prisma.category.findMany({ select: { id: true, name: true, nameTh: true } }),
   ]);
-  const name = new Map(cats.map((c) => [c.id, c.name]));
+  const name = new Map(cats.map((c) => [c.id, L(c)]));
   const keys = new Set([...created.map((c) => `${c.categoryId}|${c.subcategoryId ?? ""}`), ...resolved.map((r) => `${r.categoryId}|${r.subcategoryId ?? ""}`)]);
   const rows = [...keys].map((k) => {
     const [cat, sub] = k.split("|");

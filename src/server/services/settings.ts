@@ -23,6 +23,8 @@ export const SETTINGS_SCHEMA = {
   "notifications.disabledTypes": z.array(z.string()).default([]),
   /** Events posted as Adaptive Cards to a support team's Microsoft Teams channel (if it has a webhook). */
   "integrations.teams.events": z.array(z.string()).default(["TICKET_CREATED", "TICKET_TRANSFERRED", "SLA_BREACHED", "MAJOR_INCIDENT"]),
+  /** Language of texts the system sends without a viewer (Microsoft Teams channel cards). */
+  "i18n.defaultLocale": z.enum(["th", "en"]).default("th"),
   /** IT asset lookup. Secret API key is stored separately (encrypted). */
   "integrations.assets": z.object({
     provider: z.enum(["none", "demo", "rest"]).default("demo"),

@@ -11,10 +11,13 @@ import { SlaTargetsForm } from "@/components/admin/sla-targets-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = { title: "SLA Targets" };
+export const generateMetadata = pageTitle("slaTargets");
 
 export default async function SlaTargetsPage({ params }: { params: Promise<{ id: string }> }) {
+  const tcfg = await getTranslations("cfg");
   const actor = await requireAdminPortal();
   if (!can(actor, P.ADMIN_SLA)) notFound();
   const d = await getSlaProfileDetail(actor, (await params).id);
@@ -27,29 +30,29 @@ export default async function SlaTargetsPage({ params }: { params: Promise<{ id:
   });
   return (
     <div className="max-w-5xl space-y-5">
-      <Link href="/admin/config/sla" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> SLA profiles</Link>
-      <PageHeader title={`SLA targets — ${profile.name}`}
-        description={<>Calendar: <Link className="text-primary hover:underline" href="/admin/config/business-hours">{calendar?.name ?? "none (24×7)"}</Link> {calendar && `(${calendar.timezone})`} · warning at {profile.warningPercent}% {profile.isDefault && <Badge className="ml-1">Default</Badge>}</>} />
+      <Link href="/admin/config/sla" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> {tcfg("slaProfiles")}</Link>
+      <PageHeader title={tcfg("slaTargetsTitle", { name: profile.name })}
+        description={<>{tcfg("calendar")} <Link className="text-primary hover:underline" href="/admin/config/business-hours">{calendar?.name ?? tcfg("none247")}</Link> {calendar && `(${calendar.timezone})`} · {tcfg("warningAt", { p: profile.warningPercent })} {profile.isDefault && <Badge className="ml-1">{tcfg("default")}</Badge>}</>} />
       <SlaTargetsForm profileId={profile.id} rows={rows} businessDayMinutes={dayLen} />
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Escalation rules</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{tcfg("escalationRules")}</CardTitle></CardHeader>
           <CardContent className="text-sm">
-            {profile.escalations.length === 0 ? <p className="text-muted-foreground">None.</p> : (
+            {profile.escalations.length === 0 ? <p className="text-muted-foreground">{tcfg("none")}</p> : (
               <ul className="space-y-1">{profile.escalations.map((e) => (
-                <li key={e.id} className={e.isActive ? "" : "opacity-50"}>{e.clock.toLowerCase()} at {e.atPercent}% → {[e.notifyTeamLead && "notify team leads", e.escalateToTeam && `transfer to ${e.escalateToTeam.name}`].filter(Boolean).join(" + ")}</li>
+                <li key={e.id} className={e.isActive ? "" : "opacity-50"}>{tcfg("escalationLine", { clock: tcfg(`clockName.${e.clock}`), p: e.atPercent, actions: [e.notifyTeamLead && tcfg("notifyLeads"), e.escalateToTeam && tcfg("transferTo", { team: e.escalateToTeam.name })].filter(Boolean).join(" + ") })}</li>
               ))}</ul>
             )}
-            <Link href="/admin/config/escalations" className="mt-2 inline-block text-primary hover:underline">Manage escalation rules</Link>
+            <Link href="/admin/config/escalations" className="mt-2 inline-block text-primary hover:underline">{tcfg("manageEscalationRules")}</Link>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-base">Used by</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{tcfg("usedBy")}</CardTitle></CardHeader>
           <CardContent className="space-y-1 text-sm">
-            {profile.isDefault && <p>All tickets without a more specific profile (default)</p>}
-            {profile.categories.map((c, i) => <p key={i}>Category: {c.parent ? `${c.parent.name} › ` : ""}{c.name}</p>)}
-            {profile.teams.map((t, i) => <p key={i}>Team: {t.name}</p>)}
-            {!profile.isDefault && !profile.categories.length && !profile.teams.length && <p className="text-muted-foreground">Not assigned to any category or team yet.</p>}
+            {profile.isDefault && <p>{tcfg("allTicketsWithoutAMoreSpecific")}</p>}
+            {profile.categories.map((c, i) => <p key={i}>{tcfg("categoryLine", { path: `${c.parent ? `${c.parent.name} › ` : ""}${c.name}` })}</p>)}
+            {profile.teams.map((t, i) => <p key={i}>{tcfg("teamLine", { name: t.name })}</p>)}
+            {!profile.isDefault && !profile.categories.length && !profile.teams.length && <p className="text-muted-foreground">{tcfg("notAssignedToAnyCategoryOr")}</p>}
           </CardContent>
         </Card>
       </div>

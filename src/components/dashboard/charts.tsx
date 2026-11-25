@@ -9,6 +9,7 @@
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 
 const AXIS = { fontSize: 11, fill: "var(--viz-muted)" };
 const tooltipProps = {
@@ -22,11 +23,13 @@ export const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", 
 export const ORDINAL = ["var(--ord-1)", "var(--ord-2)", "var(--ord-3)", "var(--ord-4)"];
 
 /** Horizontal bars for one measure across categories (single hue unless rows carry an entity color). */
-export function BarList({ data, height, useEntityColor = false, valueLabel = "Tickets" }: {
+export function BarList({ data, height, useEntityColor = false, valueLabel }: {
   data: { name: string; count: number; color?: string }[]; height?: number; useEntityColor?: boolean; valueLabel?: string;
 }) {
+  const td = useTranslations("dash");
+  valueLabel ??= td("tickets");
   const h = height ?? Math.max(120, data.length * 30 + 30);
-  if (!data.length) return <p className="py-10 text-center text-sm text-muted-foreground">No data for the selected filters.</p>;
+  if (!data.length) return <p className="py-10 text-center text-sm text-muted-foreground">{td("noDataForTheSelectedFilters")}</p>;
   return (
     <ResponsiveContainer width="100%" height={h}>
       <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }} barCategoryGap={6}>
@@ -99,8 +102,9 @@ export function StackedColumns({ data, keys, height = 260, xKey = "label" }: {
 export function GroupedBars({ data, series, height }: {
   data: Record<string, string | number>[]; series: { key: string; label: string }[]; height?: number;
 }) {
+  const td = useTranslations("dash");
   const h = height ?? Math.max(160, data.length * (14 * series.length + 14) + 40);
-  if (!data.length) return <p className="py-10 text-center text-sm text-muted-foreground">No data for the selected filters.</p>;
+  if (!data.length) return <p className="py-10 text-center text-sm text-muted-foreground">{td("noDataForTheSelectedFilters")}</p>;
   return (
     <ResponsiveContainer width="100%" height={h}>
       <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }} barGap={2} barCategoryGap={10}>

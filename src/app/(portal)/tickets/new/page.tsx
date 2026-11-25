@@ -7,23 +7,29 @@ import { getCreateTicketOptions } from "@/server/services/tickets";
 import { PageHeader } from "@/components/ui/misc";
 import { CreateTicketForm } from "@/components/tickets/create-ticket-form";
 import { KnownIssuesBanner } from "@/components/incidents/known-issues";
+import { getTranslations } from "next-intl/server";
+import { currentLocale } from "@/i18n/server";
+import { ln } from "@/lib/localized";
 
-export const metadata = { title: "Create Ticket" };
+export async function generateMetadata() {
+  return { title: (await getTranslations("createTicket"))("pageTitle") };
+}
 
 export default async function NewTicketPage() {
   const actor = await requireActor();
   if (!can(actor, P.TICKET_CREATE)) notFound();
+  const [locale, t] = await Promise.all([currentLocale(), getTranslations("createTicket")]);
   const [opts, me] = await Promise.all([
-    getCreateTicketOptions(actor),
+    getCreateTicketOptions(actor, locale),
     prisma.user.findUniqueOrThrow({ where: { id: actor.id }, include: { department: true, company: true } }),
   ]);
   return (
     <div>
-      <PageHeader title="Create Ticket" description="Report an incident or request IT service." />
+      <PageHeader title={t("pageTitle")} description={t("pageDescription")} />
       <div className="mb-5"><KnownIssuesBanner actor={actor} /></div>
       <CreateTicketForm
         {...opts}
-        defaults={{ branchId: me.branchId, contactNumber: me.contactNumber, requester: me.displayName, department: me.department?.name ?? null, company: me.company?.name ?? null }}
+        defaults={{ branchId: me.branchId, contactNumber: me.contactNumber, requester: me.displayName, department: me.department ? ln(me.department, locale) : null, company: me.company?.name ?? null }}
       />
     </div>
   );

@@ -6,20 +6,24 @@ import { DecisionButtons } from "@/components/approvals/approval-ui";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, ColorBadge } from "@/components/ui/badge";
-import { formatDateTime } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
+import { currentLocale, getFormat } from "@/i18n/server";
+import { ln, pickLang } from "@/lib/localized";
+import { pageTitle } from "@/i18n/metadata";
 
-export const metadata = { title: "My Approvals" };
+export const generateMetadata = pageTitle("myApprovals");
 
 export default async function ApprovalsPage() {
   const actor = await requireActor();
   const { pending, decided } = await myApprovals(actor);
+  const [ta, tp, f, locale] = await Promise.all([getTranslations("approvals"), getTranslations("pageTitle"), getFormat(), currentLocale()]);
   return (
     <div className="space-y-5">
-      <PageHeader title="My Approvals" description="Requests from your team that need your decision." />
+      <PageHeader title={tp("myApprovals")} description={ta("pageDescription")} />
       <Card>
-        <CardHeader><CardTitle className="text-base">Waiting for you ({pending.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{ta("waitingForYou", { count: pending.length })}</CardTitle></CardHeader>
         <CardContent>
-          {pending.length === 0 ? <EmptyState icon={<CheckSquare />} title="Nothing to approve" description="You're all caught up." /> : (
+          {pending.length === 0 ? <EmptyState icon={<CheckSquare />} title={ta("nothingTitle")} description={ta("nothingDesc")} /> : (
             <ul className="divide-y" data-testid="pending-approvals">
               {pending.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-start gap-4 py-4">
@@ -27,13 +31,13 @@ export default async function ApprovalsPage() {
                     <p className="flex flex-wrap items-center gap-2">
                       <Link href={`/tickets/${a.ticket.number}`} className="font-mono text-sm font-medium text-primary hover:underline">{a.ticket.number}</Link>
                       <ColorBadge color={a.ticket.priority.color}>{a.ticket.priority.code}</ColorBadge>
-                      <Badge variant="secondary">{a.stepName}</Badge>
+                      <Badge variant="secondary">{pickLang(a.stepName, a.stepNameTh, locale)}</Badge>
                     </p>
                     <p className="font-medium">{a.ticket.subject}</p>
                     <p className="line-clamp-2 text-sm text-muted-foreground">{a.ticket.description}</p>
                     <p className="text-xs text-muted-foreground">
-                      {a.ticket.requester.displayName}{a.ticket.requester.jobTitle ? `, ${a.ticket.requester.jobTitle}` : ""}{a.ticket.requester.department ? ` · ${a.ticket.requester.department.name}` : ""}
-                      {" · "}{a.ticket.category.name}{a.ticket.subcategory ? ` › ${a.ticket.subcategory.name}` : ""} · {formatDateTime(a.ticket.createdAt)}
+                      {a.ticket.requester.displayName}{a.ticket.requester.jobTitle ? `, ${a.ticket.requester.jobTitle}` : ""}{a.ticket.requester.department ? ` · ${ln(a.ticket.requester.department, locale)}` : ""}
+                      {" · "}{ln(a.ticket.category, locale)}{a.ticket.subcategory ? ` › ${ln(a.ticket.subcategory, locale)}` : ""} · {f.dateTime(a.ticket.createdAt)}
                     </p>
                   </div>
                   <DecisionButtons approvalId={a.id} ticketNumber={a.ticket.number} />
@@ -45,15 +49,15 @@ export default async function ApprovalsPage() {
       </Card>
       {decided.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Recently decided</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{ta("recentlyDecided")}</CardTitle></CardHeader>
           <CardContent>
             <ul className="divide-y text-sm" data-testid="decided-approvals">
               {decided.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-center gap-3 py-2">
                   <Link href={`/tickets/${a.ticket.number}`} className="font-mono text-primary hover:underline">{a.ticket.number}</Link>
                   <span className="min-w-0 flex-1 truncate">{a.ticket.subject}</span>
-                  <Badge variant={a.decision === "APPROVED" ? "success" : "destructive"}>{a.decision === "APPROVED" ? "Approved" : "Rejected"}</Badge>
-                  <span className="text-xs text-muted-foreground">{a.decidedAt ? formatDateTime(a.decidedAt) : ""}</span>
+                  <Badge variant={a.decision === "APPROVED" ? "success" : "destructive"}>{ta(`decision.${a.decision}`)}</Badge>
+                  <span className="text-xs text-muted-foreground">{a.decidedAt ? f.dateTime(a.decidedAt) : ""}</span>
                 </li>
               ))}
             </ul>

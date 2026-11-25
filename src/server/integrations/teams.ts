@@ -4,6 +4,9 @@ import { getSettings } from "@/server/services/settings";
 import { decryptSecret } from "./crypto";
 import { assertOutboundUrl, TEAMS_WEBHOOK_HOSTS } from "./ssrf";
 import { httpRequest } from "./http";
+import { translateServerText } from "@/i18n/server-text-translate";
+import { ln } from "@/lib/localized";
+import type { Locale } from "@/i18n/config";
 
 type Tx = Prisma.TransactionClient;
 
@@ -27,7 +30,7 @@ export interface CardInput {
 }
 
 /** Adaptive Card 1.4 inside the Teams message envelope (incoming webhooks and Workflows both accept it). */
-export function buildAdaptiveCard(c: CardInput) {
+export function buildAdaptiveCard(c: CardInput, locale: Locale = "en") {
   const body: unknown[] = [
     { type: "TextBlock", text: c.title, weight: "Bolder", size: "Medium", wrap: true, color: c.tone === "attention" ? "Attention" : c.tone === "warning" ? "Warning" : c.tone === "good" ? "Good" : "Accent" },
   ];
@@ -41,7 +44,7 @@ export function buildAdaptiveCard(c: CardInput) {
       contentType: "application/vnd.microsoft.card.adaptive",
       content: {
         $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.4", body,
-        ...(c.url ? { actions: [{ type: "Action.OpenUrl", title: "Open ticket", url: c.url }] } : {}),
+        ...(c.url ? { actions: [{ type: "Action.OpenUrl", title: translateServerText("Open ticket", locale), url: c.url }] } : {}),
       },
     }],
   };
@@ -60,20 +63,24 @@ export async function enqueueTeamsCard(tx: Tx, input: {
   title: string; text?: string; extraFacts?: [string, string | null | undefined][]; tone?: CardInput["tone"];
 }) {
   if (!input.teamId) return;
-  const team = await tx.supportTeam.findUnique({ where: { id: input.teamId }, select: { id: true, name: true, teamsWebhookEnc: true, isActive: true } });
+  const team = await tx.supportTeam.findUnique({ where: { id: input.teamId }, select: { id: true, name: true, nameTh: true, teamsWebhookEnc: true, isActive: true } });
   if (!team?.teamsWebhookEnc || !team.isActive) return;
   const settings = await getSettings(tx);
   if (!settings["integrations.teams.events"].includes(input.event)) return;
   const t = await tx.ticket.findUniqueOrThrow({
     where: { id: input.ticketId },
-    select: { id: true, number: true, subject: true, isConfidential: true, priority: { select: { code: true, name: true } }, status: { select: { name: true } } },
+    select: { id: true, number: true, subject: true, isConfidential: true, priority: { select: { code: true, name: true, nameTh: true } }, status: { select: { name: true, nameTh: true } } },
   });
+  // Channel cards have no single viewer: they use the system's default language (i18n.defaultLocale).
+  const loc = settings["i18n.defaultLocale"];
+  const tr = (x: string) => translateServerText(x, loc);
   const card = buildAdaptiveCard({
-    title: input.title,
-    subtitle: t.isConfidential ? `${t.number} · confidential` : `${t.number} · ${t.subject}`,
-    facts: [["Team", team.name], ["Priority", `${t.priority.code} – ${t.priority.name}`], ["Status", t.status.name], ...(input.extraFacts ?? [])],
+    title: tr(input.title),
+    subtitle: t.isConfidential ? `${t.number} · ${tr("confidential")}` : `${t.number} · ${t.subject}`,
+    facts: [[tr("Team"), ln(team, loc)], [tr("Priority"), `${t.priority.code} – ${ln(t.priority, loc)}`], [tr("Status"), ln(t.status, loc)],
+      ...(input.extraFacts ?? []).map(([k, v]): [string, string | null | undefined] => [tr(k), v == null ? v : tr(v)])],
     text: t.isConfidential ? undefined : input.text, url: `${appUrl()}/admin/tickets/${encodeURIComponent(t.number)}`, tone: input.tone,
-  });
+  }, loc);
   await tx.integrationOutbox.create({ data: { channel: "teams", event: input.event, target: `team:${team.id}`, payload: card as Prisma.InputJsonValue, ticketId: t.id } });
 }
 

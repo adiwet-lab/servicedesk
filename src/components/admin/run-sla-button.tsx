@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { Play } from "lucide-react";
 import { runSlaCheckAction } from "@/server/actions/admin";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 export function RunSlaButton() {
+  const tsettings = useTranslations("settings");
   const [pending, start] = useTransition();
   const [result, setResult] = useState<string | null>(null);
   const router = useRouter();
@@ -18,7 +20,7 @@ export function RunSlaButton() {
         setResult(d.skipped ? "Another instance is running the SLA check right now — try again in a moment."
           : `Checked: ${d.warnings} warning(s), ${d.breaches} breach(es), ${d.escalations} escalation(s), ${d.tasksOverdue} overdue task(s), ${d.autoClosed} auto-closed, ${d.backfilled} backfilled in ${d.durationMs} ms.`);
         router.refresh();
-      })}><Play /> {pending ? "Running…" : "Run SLA check now"}</Button>
+      })}><Play /> {pending ? tsettings("running") : tsettings("runSlaCheckNow")}</Button>
       {result && <span className="text-sm text-muted-foreground" data-testid="run-sla-result">{result}</span>}
     </div>
   );

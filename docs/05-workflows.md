@@ -173,3 +173,10 @@ Seeded: Hardware Request, Access Request, New Equipment → line manager (fallba
 - **Teams events** (configurable): new ticket for a team, transfer to a team, SLA breach, major incident declared/updated/resolved.
 - **Graph sync**: per tenant, every *N* hours (default 24) or *Sync now*; see the security register for the rules.
 - **Power BI**: `GET /api/bi/v1/{tickets|tasks|sla-events|teams|categories|priorities|statuses|branches|departments}`; `$top` ≤ 5000, `$skip`, `modifiedSince`; `@odata.nextLink` for paging.
+
+## Languages (Phase 8)
+- Locale per request: signed-in user's saved language → `NEXT_LOCALE` cookie → Thai. No language segment in URLs.
+- Texts that belong to a viewer are rendered when shown (pages, notifications, toasts, CSV exports). Texts without a viewer use the system setting `i18n.defaultLocale` (Teams channel cards).
+- Stored business data is not translated: ticket history keeps the status names valid at the time; subjects, descriptions, chat and notes stay as written.
+- Approval step names are snapshotted with their Thai name (`TicketApproval.stepNameTh`) when the ticket is created.
+

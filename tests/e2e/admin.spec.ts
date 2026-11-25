@@ -9,7 +9,8 @@ test("admin adds a subcategory and it appears in the create-ticket form", async 
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Parent (main category)").selectOption({ label: "IT Request" });
   await dialog.getByLabel("Code").fill(`E2E-${Date.now()}`);
-  await dialog.getByLabel("Name").fill(name);
+  await dialog.locator("#f-name").fill(name);
+  await dialog.getByLabel("Name (TH)").fill(`หมวดทดสอบ ${name}`);
   await dialog.getByTestId("crud-save").click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(`↳ ${name}`)).toBeVisible();

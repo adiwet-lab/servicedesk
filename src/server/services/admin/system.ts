@@ -14,7 +14,7 @@ export async function getSystemSettings(actor: Actor) {
   const [settings, sequences, teams, priorities, statuses] = await Promise.all([
     getSettings(prisma),
     prisma.numberSequence.findMany({ orderBy: { key: "asc" } }),
-    prisma.supportTeam.findMany({ where: { isActive: true, deletedAt: null }, select: { code: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.supportTeam.findMany({ where: { isActive: true, deletedAt: null }, select: { code: true, name: true, nameTh: true }, orderBy: { name: "asc" } }),
     prisma.priority.findMany({ where: { isActive: true }, orderBy: { level: "asc" } }),
     prisma.ticketStatus.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }),
   ]);
@@ -111,7 +111,7 @@ export async function getSlaProfileDetail(actor: Actor, id: string) {
     include: {
       businessHours: { include: { holidays: true } }, targets: true,
       escalations: { include: { escalateToTeam: true }, orderBy: [{ clock: "asc" }, { atPercent: "asc" }] },
-      categories: { select: { name: true, parent: { select: { name: true } } } }, teams: { select: { name: true } },
+      categories: { select: { name: true, nameTh: true, parent: { select: { name: true, nameTh: true } } } }, teams: { select: { name: true, nameTh: true } },
     },
   });
   if (!profile) return null;

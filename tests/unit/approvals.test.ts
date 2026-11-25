@@ -11,9 +11,13 @@ describe("resolveApprovalChain", () => {
   it("resolves the requester's manager and specific users in order", () => {
     const r = resolveApprovalChain([it2, mgr], { id: "req", managerId: "boss" }, users(["boss", true], ["itlead", true], ["fb", true]));
     expect(r).toEqual({ ok: true, steps: [
-      { order: 1, name: "Manager approval", approverId: "boss", viaFallback: false },
-      { order: 2, name: "IT approval", approverId: "itlead", viaFallback: false },
+      { order: 1, name: "Manager approval", nameTh: null, approverId: "boss", viaFallback: false },
+      { order: 2, name: "IT approval", nameTh: null, approverId: "itlead", viaFallback: false },
     ] });
+  });
+  it("carries the Thai step name", () => {
+    const r = resolveApprovalChain([{ ...mgr, nameTh: "อนุมัติโดยหัวหน้า" }], { id: "req", managerId: "boss" }, users(["boss", true]));
+    expect(r.ok && r.steps[0]).toMatchObject({ name: "Manager approval", nameTh: "อนุมัติโดยหัวหน้า" });
   });
   it("falls back when the manager is missing, inactive or the requester themself", () => {
     for (const [managerId, list] of [[null, users(["fb", true])], ["boss", users(["boss", false], ["fb", true])], ["req", users(["req", true], ["fb", true])]] as const) {

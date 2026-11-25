@@ -6,25 +6,28 @@ import { GroupedBars } from "@/components/dashboard/charts";
 import { Panel } from "@/components/dashboard/widgets";
 import { WorkloadTable } from "@/components/dashboard/workload-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { pageTitle } from "@/i18n/metadata";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = { title: "Workload" };
+export const generateMetadata = pageTitle("workload");
 
 export default async function WorkloadDashboard({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const td = await getTranslations("dash");
   const actor = await requireAdminPortal();
   const params = await searchParams;
   const { filters, options } = await loadDashboard(actor, "workload", params);
   const w = await getWorkload(actor, filters);
   return (
-    <DashboardFrame actor={actor} current="workload" title="Workload" description="Current open work per agent and team; completed = resolved in the period."
+    <DashboardFrame actor={actor} current="workload" title={td("workload")} description={td("currentOpenWorkPerAgentAnd")}
       params={params} options={options} filters={filters} hide={["agent", "status"]}>
-      <Panel title="Agent workload">
+      <Panel title={td("agentWorkload")}>
         <GroupedBars data={w.agents.slice(0, 25).map((a) => ({ name: a.name, assigned: a.assigned, openTasks: a.openTasks, completed: a.completed }))}
-          series={[{ key: "assigned", label: "Assigned tickets" }, { key: "openTasks", label: "Open tasks" }, { key: "completed", label: "Completed in period" }]} />
+          series={[{ key: "assigned", label: td("chart.assignedTickets") }, { key: "openTasks", label: td("chart.openTasks") }, { key: "completed", label: td("chart.completed") }]} />
         <WorkloadTable rows={w.agents} />
       </Panel>
-      <Panel title="Teams">
+      <Panel title={td("teams")}>
         <Table className="text-sm" data-testid="team-table">
-          <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Team</TableHead><TableHead className="text-right">Open</TableHead><TableHead className="text-right">Unassigned</TableHead><TableHead className="text-right">Overdue</TableHead><TableHead className="text-right">SLA breached</TableHead><TableHead className="text-right">Completed</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{td("team")}</TableHead><TableHead className="text-right">{td("open")}</TableHead><TableHead className="text-right">{td("unassigned")}</TableHead><TableHead className="text-right">{td("overdue")}</TableHead><TableHead className="text-right">{td("slaBreached")}</TableHead><TableHead className="text-right">{td("completed")}</TableHead></TableRow></TableHeader>
           <TableBody>
             {w.teams.map((t) => (
               <TableRow key={t.teamId}>

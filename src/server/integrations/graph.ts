@@ -101,7 +101,7 @@ export async function syncTenantDirectory(tenantId: string, actor: Actor | null)
     if (!tenant.isActive) throw new Error("Tenant is inactive.");
     const users = await fetchDirectoryUsers(tenant.entraTenantId);
     r.fetched = users.length;
-    const depts = tenant.companyId ? await prisma.department.findMany({ where: { companyId: tenant.companyId, deletedAt: null }, select: { id: true, name: true, code: true } }) : [];
+    const depts = tenant.companyId ? await prisma.department.findMany({ where: { companyId: tenant.companyId, deletedAt: null }, select: { id: true, name: true, nameTh: true, code: true } }) : [];
     const deptBy = new Map<string, string>();
     for (const d of depts) { deptBy.set(d.name.toLowerCase(), d.id); deptBy.set(d.code.toLowerCase(), d.id); }
     const unmapped = new Set<string>();

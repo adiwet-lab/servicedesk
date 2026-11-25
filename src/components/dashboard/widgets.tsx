@@ -2,16 +2,18 @@ import Link from "next/link";
 import { CheckCircle2, AlertTriangle, XCircle, MinusCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 /** Accessible table view behind a chart (also the drill-down entry point). */
 export function BreakdownTable({ rows, label, total, swatch = false }: {
   rows: { id: string | null; name: string; count: number; color?: string; href?: string }[]; label: string; total?: number; swatch?: boolean;
 }) {
+  const td = useTranslations("dash");
   const sum = total ?? rows.reduce((a, r) => a + r.count, 0);
   if (!rows.length) return null;
   return (
     <Table className="text-xs">
-      <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{label}</TableHead><TableHead className="text-right">Tickets</TableHead><TableHead className="text-right">Share</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{label}</TableHead><TableHead className="text-right">{td("tickets")}</TableHead><TableHead className="text-right">{td("share")}</TableHead></TableRow></TableHeader>
       <TableBody>
         {rows.map((r) => (
           <TableRow key={r.id ?? r.name}>
@@ -32,12 +34,13 @@ export function BreakdownTable({ rows, label, total, swatch = false }: {
 
 /** Compliance stat with meter; state is carried by icon + label, never color alone. */
 export function ComplianceMeter({ label, value, target = 95, hint }: { label: string; value: number | null; target?: number; hint?: string }) {
+  const td = useTranslations("dash");
   const state = value == null ? "none" : value >= target ? "good" : value >= target - 10 ? "warning" : "critical";
   const meta = {
-    good: { color: "var(--status-good)", Icon: CheckCircle2, text: "Meets target" },
-    warning: { color: "var(--status-warning)", Icon: AlertTriangle, text: "Below target" },
-    critical: { color: "var(--status-critical)", Icon: XCircle, text: "Well below target" },
-    none: { color: "var(--viz-axis)", Icon: MinusCircle, text: "No SLA data" },
+    good: { color: "var(--status-good)", Icon: CheckCircle2, text: td("meetsTarget") },
+    warning: { color: "var(--status-warning)", Icon: AlertTriangle, text: td("belowTarget") },
+    critical: { color: "var(--status-critical)", Icon: XCircle, text: td("wellBelowTarget") },
+    none: { color: "var(--viz-axis)", Icon: MinusCircle, text: td("noSlaData") },
   }[state];
   return (
     <div className="rounded-xl border bg-card p-4" data-testid={`meter-${label}`}>
@@ -47,7 +50,7 @@ export function ComplianceMeter({ label, value, target = 95, hint }: { label: st
         <div className="h-full rounded-full" style={{ width: `${value ?? 0}%`, backgroundColor: meta.color }} />
       </div>
       <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-        <meta.Icon className="size-3.5" style={{ color: meta.color }} aria-hidden /> {meta.text} · target {target}%{hint ? ` · ${hint}` : ""}
+        <meta.Icon className="size-3.5" style={{ color: meta.color }} aria-hidden /> {meta.text} · {td("targetPct", { v: target })}{hint ? ` · ${hint}` : ""}
       </p>
     </div>
   );
