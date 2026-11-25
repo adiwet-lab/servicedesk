@@ -14,4 +14,9 @@ export async function loginAs(page: Page, displayName: string, locale: "en" | "t
   // On a cold dev server the first page compile can trigger a Fast Refresh reload that would
   // abort the test's next navigation; let the landing page settle first.
   await page.waitForLoadState("networkidle").catch(() => undefined);
+  // A language saved on the user wins over the cookie: switch back if a previous test changed it.
+  if ((await page.locator("html").getAttribute("lang")) !== locale) {
+    await page.getByTestId(`lang-${locale}`).first().click();
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+  }
 }

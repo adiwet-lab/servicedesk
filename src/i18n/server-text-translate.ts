@@ -7,6 +7,7 @@ import type { Locale } from "./config";
  * values use the `srvTpl` patterns ({name} = any text); `validation.*` strings are catalog keys.
  * Text without a translation is returned unchanged (English).
  */
+const TERM_PARAMS = new Set(["clock", "status"]);
 type Entry = { re: RegExp; names: string[]; target: string };
 const cache = new Map<Locale, { exact: Map<string, string>; patterns: Entry[]; validation: Record<string, string> }>();
 
@@ -42,8 +43,9 @@ export function translateServerText(text: string, locale: Locale): string {
   if (hit) return hit;
   for (const p of t.patterns) {
     const m = p.re.exec(text);
-    // Captured values are translated too when they are known terms (e.g. "response", a status label).
-    if (m) return p.names.reduce((out, n, i) => out.split(`{${n}}`).join(t.exact.get(m[i + 1]) ?? m[i + 1]), p.target);
+    // Values named clock/status are fixed terms ("response", a major-incident status) and are translated too;
+    // other values (names, numbers, free text) are kept as they are.
+    if (m) return p.names.reduce((out, n, i) => out.split(`{${n}}`).join(TERM_PARAMS.has(n) ? t.exact.get(m[i + 1]!) ?? m[i + 1]! : m[i + 1]!), p.target);
   }
   return text;
 }
